@@ -588,6 +588,26 @@ test('自定义代理地址不被协议切换改写', () => {
   assert.equal(byLabel(current(), '接入方式').props.value, 'custom');
 });
 
+test('媒体模型下拉下方显示所选模型的简介', () => {
+  const Client = loadClient();
+  const current = mount(Client, { state: {
+    connection: { baseURL: BASE_URL },
+    media: { imageModel: 'image-01', videoModel: 'MiniMax-H3', speechModel: '', musicModel: '' },
+    modelOverrides: [],
+  } });
+  const text = textsOf(current());
+  // 媒体模型区默认折叠，先展开
+  assert.doesNotMatch(text, /文生图与图生图/, '折叠时不渲染简介');
+  buttonByText(current(), '媒体模型').props.onClick();
+  const expanded = textsOf(current());
+  assert.match(expanded, /文生图与图生图/, '图片模型要有简介');
+  assert.match(expanded, /视频 v2 接口，画质优先/, '视频模型要有简介');
+  // 未选择媒体模型时不显示简介
+  const blank = mount(Client, { state: { connection: { baseURL: BASE_URL }, media: {}, modelOverrides: [] } });
+  buttonByText(blank(), '媒体模型').props.onClick();
+  assert.doesNotMatch(textsOf(blank()), /文生图与图生图/);
+});
+
 test('已保存的 API 地址原样回显', () => {
   const Client = loadClient();
   const current = mount(Client, { state: {

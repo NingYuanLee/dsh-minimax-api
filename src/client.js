@@ -103,6 +103,24 @@ export const zh = {
   'settings.media.video': '生成视频',
   'settings.media.speech': '生成语音',
   'settings.media.music': '生成音乐',
+  'settings.modelNote.image-01': '文生图与图生图：8 种宽高比、n 1–9，可指定 512–2048 像素宽高；21:9 仅此模型支持。',
+  'settings.modelNote.image-01-live': '在 image-01 基础上支持画风（漫画/元气/中世纪/水彩），不支持 21:9。',
+  'settings.modelNote.MiniMax-H3': '视频 v2 接口，画质优先：768P/2K，4–15 秒，文生/图生视频。',
+  'settings.modelNote.MiniMax-H3-Highspeed': '视频 v2 接口，质量与速度兼顾：480P/768P，4–15 秒。',
+  'settings.modelNote.MiniMax-H3-Lite': '视频 v2 接口，轻量版：480P/768P，4–15 秒，不支持 adaptive 画幅。',
+  'settings.modelNote.MiniMax-H3-Max': '视频 v2 接口，极速版：480P/768P，5–15 秒。',
+  'settings.modelNote.MiniMax-Hailuo-2.3': '视频 v1 接口，Hailuo 系列：6/10 秒，512P–1080P，文生/图生视频。',
+  'settings.modelNote.MiniMax-Hailuo-2.3-Fast': '视频 v1 接口，Hailuo 快速版：仅图生视频，6/10 秒。',
+  'settings.modelNote.MiniMax-Hailuo-02': '视频 v1 接口，上一代 Hailuo：6/10 秒，文生/图生视频。',
+  'settings.modelNote.speech-2.8-hd': '语音合成 HD，最新一代：情绪与语气词表现最好，单次 ≤10000 字符。',
+  'settings.modelNote.speech-2.8-turbo': '语音合成 Turbo，最新一代：速度最快，音质略低于 HD。',
+  'settings.modelNote.speech-2.6-hd': '语音合成 HD，上一代：韵律与音质均衡。',
+  'settings.modelNote.speech-2.6-turbo': '语音合成 Turbo，上一代：低时延、成本低。',
+  'settings.modelNote.speech-02-hd': '语音合成 HD，较早一代：音色复刻相似度高。',
+  'settings.modelNote.speech-02-turbo': '语音合成 Turbo，较早一代：稳定、小语种支持较好。',
+  'settings.modelNote.music-3.0': '音乐模型已退役：2026-08-20 起不向新用户开放，仅存量付费账号可用。',
+  'settings.modelNote.music-2.6': '音乐模型已退役：仅存量付费账号可用。',
+  'settings.modelNote.music-cover': '音乐翻唱模型已退役：仅存量付费账号可用。',
   'settings.effort.unset': '未设置',
   'settings.effort.aria': '思考强度 {index}',
   'settings.effort.optionsAria': '思考强度选项 {index}',
@@ -250,6 +268,24 @@ export const en = {
   'settings.media.video': 'Video generation',
   'settings.media.speech': 'Speech generation',
   'settings.media.music': 'Music generation',
+  'settings.modelNote.image-01': 'Text and image to image: 8 aspect ratios, n 1–9, optional 512–2048 px size; 21:9 only on this model.',
+  'settings.modelNote.image-01-live': 'image-01 plus style settings (comic / energetic / medieval / watercolor); no 21:9.',
+  'settings.modelNote.MiniMax-H3': 'Video v2 endpoint, quality first: 768P/2K, 4–15 s, text or image to video.',
+  'settings.modelNote.MiniMax-H3-Highspeed': 'Video v2 endpoint, balanced quality and speed: 480P/768P, 4–15 s.',
+  'settings.modelNote.MiniMax-H3-Lite': 'Video v2 endpoint, light version: 480P/768P, 4–15 s, no adaptive ratio.',
+  'settings.modelNote.MiniMax-H3-Max': 'Video v2 endpoint, fastest version: 480P/768P, 5–15 s.',
+  'settings.modelNote.MiniMax-Hailuo-2.3': 'Video v1 endpoint, Hailuo family: 6 or 10 s, 512P–1080P, text or image to video.',
+  'settings.modelNote.MiniMax-Hailuo-2.3-Fast': 'Video v1 endpoint, fast Hailuo: image to video only, 6 or 10 s.',
+  'settings.modelNote.MiniMax-Hailuo-02': 'Video v1 endpoint, previous Hailuo generation: 6 or 10 s, text or image to video.',
+  'settings.modelNote.speech-2.8-hd': 'Speech HD, newest generation: best emotion and interjections, up to 10000 characters per call.',
+  'settings.modelNote.speech-2.8-turbo': 'Speech Turbo, newest generation: fastest, slightly below HD quality.',
+  'settings.modelNote.speech-2.6-hd': 'Speech HD, previous generation: balanced prosody and quality.',
+  'settings.modelNote.speech-2.6-turbo': 'Speech Turbo, previous generation: low latency, low cost.',
+  'settings.modelNote.speech-02-hd': 'Speech HD, earlier generation: strong voice-clone similarity.',
+  'settings.modelNote.speech-02-turbo': 'Speech Turbo, earlier generation: stable, better minor-language support.',
+  'settings.modelNote.music-3.0': 'Music model retired: closed to new users since 2026-08-20, existing paying accounts only.',
+  'settings.modelNote.music-2.6': 'Music model retired: existing paying accounts only.',
+  'settings.modelNote.music-cover': 'Music cover model retired: existing paying accounts only.',
   'settings.effort.unset': 'Not set',
   'settings.effort.aria': 'Reasoning effort {index}',
   'settings.effort.optionsAria': 'Reasoning effort options {index}',
@@ -535,6 +571,17 @@ const MEDIA_CATEGORY_PATTERNS = {
   music: [/music/i],
 };
 const MEDIA_CATEGORIES = ['image', 'video', 'speech', 'music'];
+// 媒体模型简介：设置页下拉下方展示一行说明，选中时更新；key 必须与字典里的 settings.modelNote.* 一致。
+const MEDIA_NOTE_IDS = new Set([
+  'image-01', 'image-01-live',
+  'MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max',
+  'MiniMax-Hailuo-2.3', 'MiniMax-Hailuo-2.3-Fast', 'MiniMax-Hailuo-02',
+  'speech-2.8-hd', 'speech-2.8-turbo', 'speech-2.6-hd', 'speech-2.6-turbo', 'speech-02-hd', 'speech-02-turbo',
+  'music-3.0', 'music-2.6', 'music-cover',
+]);
+function modelNoteOf(id, t) {
+  return id && MEDIA_NOTE_IDS.has(id) ? t('settings.modelNote.' + id) : '';
+}
 function matchesMediaCategory(id, category, want) {
   if (category) return category === want;
   return (MEDIA_CATEGORY_PATTERNS[want] || []).some(pattern => pattern.test(String(id || '')));
@@ -742,12 +789,15 @@ export function MinimaxSettings(props) {
   const mediaPicker = (key, label, category) => {
     const options = mediaOptions(category, key);
     const current = options.includes(media[key]) ? media[key] : '';
-    return h('label', { key: 'media' + key, style: ui.label }, label,
-      h('select', { value: current, disabled: busy, 'aria-label': label,
-        onChange: event => setMedia(key, { [key]: event.target.value }),
-        style: ui.control },
-        h('option', { value: '' }, options.length || discovered ? t('settings.media.none') : t('settings.getModelsFirst')),
-        ...options.map(id => h('option', { key: id, value: id }, id))));
+    const note = modelNoteOf(current, t);
+    return h('div', { key: 'media' + key, style: { display: 'grid', gap: 4 } },
+      h('label', { style: ui.label }, label,
+        h('select', { value: current, disabled: busy, 'aria-label': label,
+          onChange: event => setMedia(key, { [key]: event.target.value }),
+          style: ui.control },
+          h('option', { value: '' }, options.length || discovered ? t('settings.media.none') : t('settings.getModelsFirst')),
+          ...options.map(id => h('option', { key: id, value: id, title: modelNoteOf(id, t) || undefined }, id)))),
+      note ? h('p', { style: ui.hint }, note) : null);
   };
 
   const chatIdOptions = exclude => {
