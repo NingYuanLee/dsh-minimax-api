@@ -21,11 +21,12 @@ One plugin, one MiniMax connection. Chat models appear in the model picker; imag
 | Durable media tasks | Task records are per session and survive restarts. Downloads write `.part` files and are renamed after validation. A failed download can be retried without regenerating, so nothing is billed twice. |
 | Results in chat | Tool result cards, file preview, and a sidebar player for MP4, MP3 and WAV. Tool cards and the player follow the dsh language. |
 
-The plugin registers two components: `minimax-byapi` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 12 tools:
+The plugin registers two components: `minimax-byapi` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 13 tools:
 
 | Tool | What it does |
 | --- | --- |
 | `minimax_models` | Refreshes the catalog and returns models grouped by capability. Optional `verify_key` checks address and key with one `GET /v1/models`. |
+| `minimax_quota` | Reads the M Plan remaining quota and reset times (5-hour and weekly windows). Subscription key only — a pay-as-you-go key is refused. |
 | `minimax_generate_image` | Text to image: `prompt`, optional `model`, aspect ratio, `n` (1–9, default 1), style settings for `image-01-live`. |
 | `minimax_edit_image` | Image to image: `prompt` plus a reference image (`subject_reference`). |
 | `minimax_generate_video` | Text to video. V2 models (MiniMax-H3 family) run 4–15 s; V1 models (Hailuo family) run 6 s or 10 s. |
@@ -83,6 +84,15 @@ On the official hosts the address and the protocol are paired: `/v1` speaks Open
 
 **MiniMax recommends the Anthropic-compatible route** (the docs label it "recommended" and the SDK examples lead with it). It serves the same two models with the same bearer key, and it is the only route where the thinking depth travels as `output_config.effort`. Use `coding-global` / `coding-cn` if you want that default; both key types work there.
 
+### M Plan quota
+
+`minimax_quota` calls `GET https://www.minimax.io/v1/token_plan/remains` (China: `https://www.minimax.cn/v1/token_plan/remains`) and returns the remaining and used quota with reset times for the 5-hour rolling window and the weekly window, plus a per-model split when the server provides one.
+
+- **Subscription key only.** A pay-as-you-go key is refused by the service; the tool reports that instead of failing silently.
+- Text, image, audio and other non-video capabilities are limited by both windows; video models are limited by the weekly window only, and unused quota does not carry over.
+- The response field names are not documented upstream: `current_*_usage_count` is reported by MiniMax issue trackers as returning *remaining*, not used. The plugin reads it as remaining and falls back to treating it as used when the number exceeds the total. Treat the MiniMax console usage page as authoritative.
+- The quota is read on demand, never polled or cached.
+
 ## Install
 
 **From git (recommended until the package reaches npm):**
@@ -127,7 +137,7 @@ Updating a git install means removing it and adding the new commit; local instal
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
 ```
 
-Removing the plugin takes its layers out of the profile: the provider, the 12 tools and the settings page are gone. Generated media and task records are **not** deleted, and the credential is **not** removed either. Delete the data directory yourself if you want the files gone:
+Removing the plugin takes its layers out of the profile: the provider, the 13 tools and the settings page are gone. Generated media and task records are **not** deleted, and the credential is **not** removed either. Delete the data directory yourself if you want the files gone:
 
 ```powershell
 Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"

@@ -83,6 +83,21 @@ M Plan 用户访问已退役模型时会被服务端自动路由到 `MiniMax-M3.
 
 插件不把退役模型写进推荐清单，但内置常量里的音乐模型带 `retired` 标记，仅为存量付费账号保留。
 
+## M Plan 额度查询
+
+官方 FAQ 给出三种查用量的方式：控制台用量页、`mmx quota` CLI、以及 API：
+
+```bash
+curl 'https://www.minimax.io/v1/token_plan/remains' -H 'Authorization: Bearer <订阅 Key>'
+```
+
+- 主机是 **www**（`www.minimax.io` / `www.minimax.cn`），与对话用的 `api.*` 主机不同；插件按当前 API 地址推出对应 www 主机，自定义地址则直接报错。
+- **必须用订阅 Key**；按量付费 Key 会被拒绝（那种计费没有 M Plan 额度）。
+- 文本、图像、语音等非视频能力受 5 小时窗口 + 周窗口限制；视频只受周窗口限制；额度不结转。
+- 上游没有公开字段表，`current_*_usage_count` 的语义在社区 issue 里被记为「剩余」而非「已用」。插件的 `normalizeQuota` 按剩余解析，遇到 `usage > total` 时回退成已用解读，并原样返回 `raw` 便于人工核对。
+
+对应工具 `minimax_quota`，返回 `interval5h` / `weekly` 的 `total` / `remaining` / `used` / `percentRemaining` / `resetAt`，以及 `models[]`（服务端给拆分时）。
+
 ## 参考来源
 
 - 快速准备与域名：<https://platform.minimax.io/docs/guides/quickstart-preparation.md>

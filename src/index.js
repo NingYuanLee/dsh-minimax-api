@@ -8,6 +8,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { normalizeBaseURL, apiRootOf, readCatalog, chatModels, expandPath, PLAN_PRESETS, DEFAULT_PLAN } from './catalog.js';
 import { buildChatAdapter } from './adapter.js';
 import { MediaManager } from './media.js';
+import { fetchQuota } from './minimax-api.js';
 import { MinimaxRuntime } from './service.js';
 
 export const name = 'minimax-byapi';
@@ -204,6 +205,13 @@ export async function apply(ctx, config) {
     if (!catalog.some(x => x.id === model && x.category === category)) throw new Error('模型未发现或类别不匹配，请先用 minimax_models 刷新，必要时在插件设置中覆盖类别');
     return model;
   }
+  // M Plan 额度：端点固定在 www 主机上，需要订阅 Key；按量付费 Key 会被拒绝。
+  async function quota() {
+    const c = structuredClone(connection());
+    const key = await readKey(c);
+    const apiRoot = apiRootOf(normalizeBaseURL(c.baseURL));
+    return fetchQuota({ apiRoot, apiKey: key, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(Math.min(c.timeoutMs, 15000))]) });
+  }
   // 工具清单在插件加载时就注册，而"当前可选模型"要等首轮发现之后才知道。
   // 做法：描述支持函数，并在每次刷新后用最新描述重新注册（工具定义会被快照，getter 不够）。
   // 设置页「获取模型」把草稿地址和一次性密钥交给这个回调；命名空间必须是插件实例 id。
@@ -249,7 +257,7 @@ export async function apply(ctx, config) {
   };
   const runtime = {
     abort, connection, mediaConfig, catalog: () => catalog, lastError: () => lastError,
-    refresh, verifyKey, discover, manager, requireModel, describeModels,
+    refresh, verifyKey, discover, manager, requireModel, describeModels, quota,
     // 首轮发现不再阻塞 apply()：需要等清单落定的一方（测试、宿主的准备流程）await 这个 promise。
     ready: null,
   };
@@ -269,8 +277,15 @@ export async function apply(ctx, config) {
     return { models: catalog, error: lastError, ...(args.verify_key ? { verify } : {}) };
   });
 
-  // 生图、视频、语音、音乐与语音转写由组件 dsh-minimax-media 注册，当前聊天模型不必是 MiniMax。
-  // 覆盖项（图片支持/上下文/最大输出）在每次刷新时由 readCatalog 应用，
+  // 额度查询走官方 www 主机上的 /v1/token_plan/remains，只有订阅 Key 能用。
+  tool('minimax_quota', '查询当前 M Plan 订阅的额度余量与窗口重置时间。用户问“我还剩多少额度 / 额度用了多少 / 什么时候重置 / M Plan 用量”时用这个工具。'
+    + '只有订阅 Key（sk-cp-…）能查：按量付费 API Key 会被服务端拒绝（那种计费本来就没有 M Plan 额度），此时工具会返回可读的错误说明。'
+    + '返回 interval5h（5 小时窗口）与 weekly（周窗口）的 total / remaining / used / percentRemaining / resetAt，以及服务端给出时按模型的拆分 models[]。'
+    + '注意：文本、图像、语音等非视频能力受 5 小时窗口与周窗口共同限制，视频只受周窗口限制；额度余量不结转。数值以服务端返回为准，最终以 MiniMax 控制台用量页为权威。',
+  {}, async () => quota());
+
+
+  // 生图、视频、语音、音乐与语音转写由组件 dsh-minimax-media 注册，当前聊天模型不必是 MiniMax。  // 覆盖项（图片支持/上下文/最大输出）在每次刷新时由 readCatalog 应用，
   // 因此改完设置只需像连接字段一样重新发现一次。
   ctx.on('loader/volatile-update', () => {
     registration?.(); registration = undefined; catalog = [];

@@ -21,11 +21,12 @@
 | 媒体任务持久化 | 媒体任务按会话隔离，重启后仍在。下载先写 `.part` 临时文件再改名。下载失败可以只重试下载，不重新生成，不会重复计费。 |
 | 结果呈现 | 工具结果卡片、文件预览，以及 MP4 / MP3 / WAV 的侧栏播放器。卡片与播放器跟随 dsh 语言。 |
 
-插件注册两个组件：`minimax-byapi`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 12 个工具：
+插件注册两个组件：`minimax-byapi`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 13 个工具：
 
 | 工具 | 作用 |
 | --- | --- |
 | `minimax_models` | 刷新模型清单，按能力分组返回。可选 `verify_key` 用一次 `GET /v1/models` 校验地址与密钥。 |
+| `minimax_quota` | 查询 M Plan 额度余量与重置时间（5 小时窗口与周窗口）。只支持订阅 Key，按量付费 Key 会被拒绝。 |
 | `minimax_generate_image` | 文生图：`prompt`，可选 `model`、宽高比、`n`（1–9，默认 1）、`image-01-live` 的画风设置。 |
 | `minimax_edit_image` | 图生图：`prompt` 加一张参考图（`subject_reference`）。 |
 | `minimax_generate_video` | 文生视频。V2 模型（MiniMax-H3 系列）4–15 秒；V1 模型（Hailuo 系列）6 秒或 10 秒。 |
@@ -83,6 +84,15 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 
 **官方推荐 Anthropic 兼容通道**（文档里标注「推荐」，SDK 示例也以它为主）。它用同一把 Bearer Key 提供同样两款模型，而且是唯一让思考深度走 `output_config.effort` 的通道。想按推荐默认值用，选 `coding-global` / `coding-cn`；两类 Key 在这条通道上都能用。
 
+### M Plan 额度
+
+`minimax_quota` 调用 `GET https://www.minimax.io/v1/token_plan/remains`（国内为 `https://www.minimax.cn/v1/token_plan/remains`），返回 5 小时滚动窗口与周窗口的余量、已用量与重置时间；服务端给出按模型拆分时也会一并返回。
+
+- **只有订阅 Key 能查。** 按量付费 Key 会被服务端拒绝，工具会如实说明，而不是静默失败。
+- 文本、图像、语音等非视频能力同时受两个窗口限制；视频模型只受周窗口限制；未用完的额度不结转。
+- 上游没有公开字段表：MiniMax 的 issue 记录指出 `current_*_usage_count` 返回的是**剩余**而不是已用。插件按「剩余」解析，若该数值大于 total 则回退成「已用」解读。最终以 MiniMax 控制台用量页为准。
+- 额度按需读取，不做轮询也不缓存。
+
 ## 安装
 
 **从 git 安装（发布到 npm 前的推荐方式）：**
@@ -127,7 +137,7 @@ git 安装的更新方式是先移除再添加新提交；本地目录安装用 
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
 ```
 
-卸载会把插件的各层从 profile 中移除：提供方、12 个工具和设置页都会消失。但**已生成的媒体与任务记录不会被删除，凭据也不会被删除**。要清掉文件请自行删除数据目录：
+卸载会把插件的各层从 profile 中移除：提供方、13 个工具和设置页都会消失。但**已生成的媒体与任务记录不会被删除，凭据也不会被删除**。要清掉文件请自行删除数据目录：
 
 ```powershell
 Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"

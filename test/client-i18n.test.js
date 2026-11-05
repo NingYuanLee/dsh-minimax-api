@@ -271,7 +271,7 @@ test('apply 注册字典并把 locale 传给每个槽位，documentPreview 标�
   assert.deepEqual(Object.keys(dictionaries[0].dicts.en).sort(), Object.keys(Client.exports.en).sort());
   assert.ok(Client.exports.inject.includes('locale'), 'inject 声明 locale 服务');
 
-  assert.equal(registered.length, 16, '插件配置 + 两个组件能力页 + 十二个工具卡片 + 媒体侧栏');
+  assert.equal(registered.length, 17, '插件配置 + 两个组件能力页 + 十三个工具卡片 + 媒体侧栏');
   for (const { options } of registered) assert.equal(options.locale, 'minimaxByapi', options.name + ' 声明 locale');
   assert.ok(registered.some(entry => entry.options.name === 'plugins.bundle.config'));
   assert.equal(previewOptions.title(), 'MiniMax media player');
@@ -288,7 +288,7 @@ test('旧宿主没有 ctx.locale 时 apply 不崩，槽位不带 locale 且标�
     effect: fn => fn(),
   };
   assert.doesNotThrow(() => Client.exports.apply(ctx));
-  assert.equal(registered.length, 16);
+  assert.equal(registered.length, 17);
   for (const options of registered) assert.equal('locale' in options, false, '旧宿主不传 locale');
   assert.equal(previewOptions.title(), 'MiniMax 媒体播放');
 });

@@ -35,7 +35,7 @@ npm pack --dry-run --ignore-scripts
 - ✅ `npm run check` 通过（2026-11-05）。
 - ✅ `npm pack --dry-run --ignore-scripts` 的产物清单为：`CHANGELOG.md`、`LICENSE`、`README.md`、`README.zh.md`、`SECURITY.md`、`assets/media.svg`、`cordis.patch.yml`、`icon.svg`、`lib/client.js`、`locale/en.json`、`locale/media/en.json`、`locale/media/zh.json`、`locale/zh.json`、`package.json`、`scripts/build-client.mjs`、`src/*.js`。
   - `package.json` 的 `files` 白名单**不含 `docs/` 与 `test/`**：仓库里的 `docs/` 说明文档只在仓库站点可见，不随安装包分发。README 的「延伸阅读」链接指向仓库路径，不表示安装包内含 `docs/` 目录。
-- ✅ `npm test` 全绿（2026-11-05）：91 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、12 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
+- ✅ `npm test` 全绿（2026-11-05）：101 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/quota.test.js`（M Plan 额度归一化、www 主机映射、按量付费 Key 拒绝、自定义地址不发请求）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、13 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
 - ✅ 独立 profile 实机安装（2026-11-05，宿主 dsh `0.2.2-rc.1`）：
   ```powershell
   dsh --profile minimax-test --from-default-profile web --dump-config
@@ -105,6 +105,13 @@ npm pack --dry-run --ignore-scripts
 - `music-3.0`、`music-2.6`、`music-cover` 在官方模型列表中标记为已退役；自 **2026-08-20** 起音乐 / 歌词 API 不再向新用户开放，存量付费账号可继续使用。
 - 来源：<https://platform.minimax.io/docs/faq/models.md>、<https://platform.minimax.io/docs/api-reference/music-generation.md>
 
+### M Plan 额度
+
+- 官方 FAQ 给出三种查用量方式：控制台用量页、`mmx quota` CLI、以及 `GET https://www.minimax.io/v1/token_plan/remains`（国内 `https://www.minimax.cn/v1/token_plan/remains`），请求头 `Authorization: Bearer <订阅 Key>`。
+- 必须用订阅 Key；按量付费 Key 会被拒绝。文本、图像、语音等非视频能力受 5 小时窗口 + 周窗口限制，视频只受周窗口限制，额度不结转。
+- 字段语义上游未公开：MiniMax-M2 issue #99 记录 `current_*_usage_count` 返回的是**剩余**而非已用；插件按剩余解析，`usage > total` 时回退为已用，并保留 `raw`。
+- 来源：<https://platform.minimax.io/docs/m-plan/faq.md>、<https://platform.minimaxi.com/docs/m-plan/faq.md>、<https://github.com/MiniMax-AI/MiniMax-M2/issues/99>
+
 ### 错误与限流（错误体形状已在插件中映射，数字码未逐条翻译）
 
 - OpenAI 风格错误体（`type` / `error.type` / `message` 末尾括号内的数字码）、Anthropic 风格错误体、以及 `base_resp.status_code` 旧式错误体三套约定并存。插件的 `src/minimax-api.js` 在 `raiseFromPayload` 里统一把这三种形状转成可读错误（例如「MiniMax 返回错误 1008：余额不足」），HTTP 非 2xx 时也会带上状态码。
@@ -118,6 +125,7 @@ npm pack --dry-run --ignore-scripts
 - ❌ **M Plan 档位差异**：未验证各订阅档位可调用的模型范围（尤其 H3 视频）。
 - ❌ **ASR 实测**：`asr-1.0` 的转写只做了接口与字段层面的文档核对，未跑真实音频。
 - ❌ **音色查询与异步长文本语音实测**：`/v1/get_voice` 与 `t2a_async_v2` 全链路只用本地桩服务验证了请求与状态机，未用真实账号跑过；真实音色列表内容与 9 小时下载窗口未验证。
+- ❌ **M Plan 额度实测**：`/v1/token_plan/remains` 的字段语义依赖社区记录（官方未公开字段表），尚未用真实订阅 Key 核对真实返回；`current_*_usage_count` 到底按剩余还是已用，需要在有订阅 Key 的账号上确认一次。
 - ❌ **音乐实测**：新账号必然失败（上游已对新用户关闭）；存量付费账号能否调用未验证。
 - ❌ **npm 发布与市场收录**：包尚未发布到 npm，安装方式为 git 或本地目录；`awesome-dsh-plugin` 等市场收录未做。
 - ⚠️ **速率限制**：官方给出 LLM 200 RPM / 10M TPM、生图 10 RPM、视频 V1 20 RPM、V2 300 RPM（最多 30 个在飞任务）、TTS 60 RPM 等限制，插件不做本地限流，完全依赖上游。

@@ -26,6 +26,8 @@ export const IMAGE_STYLE_TYPES = ['漫画', '元气', '中世纪', '水彩'];
 export const PROMPT_EXPANSION_MODES = ['disabled', 'balanced', 'quality'];
 // v2 视频的四个模型。
 export const VIDEO_V2_MODELS = ['MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max'];
+// M Plan 额度查询端点固定在 www 主机上（官方 FAQ 的 curl 就是这么写的），与 API 主机不同。
+export const QUOTA_HOSTS = { 'api.minimax.io': 'www.minimax.io', 'api.minimax.cn': 'www.minimax.cn', 'api.minimaxi.com': 'www.minimaxi.com' };
 // 官方文档给出的语音音色情绪。
 export const VOICE_EMOTIONS = ['happy', 'sad', 'angry', 'fearful', 'disgusted', 'surprised', 'calm', 'fluent', 'whisper'];
 // 转写接口的输入与时长上限。
@@ -361,4 +363,72 @@ export async function transcribeAudio({ apiRoot, apiKey, fetchImpl = fetch, sign
     segments: payload.segments,
     traceId: payload.trace_id,
   };
+}
+
+// ── M Plan 额度 ────────────────────────────────────────────────────────────
+// 官方端点：GET https://www.minimax.io/v1/token_plan/remains（国内 www.minimax.cn），
+// 必须用订阅 Key；按量付费 Key 会被拒绝。官方文档没有公开返回字段表，
+// 社区实测（MiniMax-M2 issue #99）指出 current_*_usage_count 返回的是「剩余」而不是「已用」，
+// 所以这里按剩余解析，并在数值自相矛盾（usage > total）时回退成 total - usage。
+
+export function quotaHostFor(apiRoot) {
+  const host = new URL(normalizeApiRoot(apiRoot)).hostname;
+  return QUOTA_HOSTS[host] || null;
+}
+
+function quotaWindow(total, usage, resetAt) {
+  const t = Number(total), u = Number(usage);
+  const reset = resetAt === undefined || resetAt === null ? undefined : resetAt;
+  if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(u) || u < 0) return { total: undefined, remaining: undefined, used: undefined, percentRemaining: undefined, resetAt: reset };
+  // usage_count 语义：官方未公开字段表，社区实测为「剩余」；若它大于 total（不可能剩余），
+  // 则按「已用」解读，此时剩余记 0。
+  const remaining = u <= t ? u : 0;
+  const used = u <= t ? t - u : u;
+  return {
+    total: t,
+    remaining,
+    used,
+    percentRemaining: Math.round((remaining / t) * 1000) / 10,
+    resetAt: reset,
+  };
+}
+
+export function normalizeQuota(payload) {
+  const body = payload && typeof payload === 'object' ? payload : {};
+  const data = body.data && typeof body.data === 'object' ? body.data : body;
+  const pick = (...keys) => { for (const key of keys) { if (data[key] !== undefined && data[key] !== null) return data[key]; } return undefined; };
+  const remainsTime = Number(pick('remains_time'));
+  const models = (Array.isArray(data.model_remains) ? data.model_remains : []).map(row => ({
+    model: row?.model ?? row?.model_name,
+    total: Number(row?.total) || undefined,
+    remaining: Number(row?.remains) || undefined,
+  })).filter(row => typeof row.model === 'string' && row.model);
+  return {
+    interval5h: quotaWindow(pick('current_interval_total_count'), pick('current_interval_usage_count'), pick('current_interval_reset_time')),
+    weekly: quotaWindow(pick('current_weekly_total_count'), pick('current_weekly_usage_count'), pick('current_weekly_reset_time')),
+    // 5 小时窗口剩余毫秒数（社区实测这是实时倒计时，不是 token 计数）
+    remainsTimeMs: Number.isFinite(remainsTime) ? remainsTime : undefined,
+    models,
+  };
+}
+
+export async function fetchQuota({ apiRoot, apiKey, fetchImpl = fetch, signal, origin }) {
+  const host = quotaHostFor(apiRoot);
+  const base = origin || (host ? 'https://' + host : '');
+  if (!base) throw new MiniMaxError('当前 API 地址不是 MiniMax 官方主机，无法查询 M Plan 额度');
+  const response = await fetchImpl(base.replace(/\/+$/, '') + '/v1/token_plan/remains', {
+    method: 'GET',
+    headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json', accept: 'application/json' },
+    redirect: 'error', signal,
+  });
+  const text = await readBody(response, 2 * 1024 * 1024);
+  let payload = null;
+  if (text) { try { payload = JSON.parse(text); } catch { payload = null; } }
+  if (response.status === 401 || response.status === 403) throw new MiniMaxError('查询 M Plan 额度需要订阅 Key（按量付费 API Key 会被拒绝）', { status: response.status });
+  if (!response.ok) {
+    raiseFromPayload(payload, response.status);
+    throw new MiniMaxError('查询 M Plan 额度失败：HTTP ' + response.status, { status: response.status });
+  }
+  raiseFromPayload(payload, response.status);
+  return { host: host || new URL(base).hostname, ...normalizeQuota(payload), raw: payload };
 }

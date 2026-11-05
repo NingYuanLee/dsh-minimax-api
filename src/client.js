@@ -116,6 +116,7 @@ export const zh = {
   'settings.cap.seeChat': '对话和模型目录属于组件 minimax-byapi。连接、密钥和模型表在插件页。',
   'settings.cap.chat': '对话\n输入：选择器里的 MiniMax 聊天模型，以及本轮消息。\n产出：流式回复。只有聊天模型会进入选择器。',
   'settings.cap.models': 'minimax_models\n输入：可选 refresh（重新拉取）、verify_key（检查地址和密钥，不返回密钥）。\n产出：按对话、图片、视频、语音、音乐分组的模型 ID。',
+  'settings.cap.quota': 'minimax_quota\n输入：无。\n产出：M Plan 的 5 小时窗口与周窗口余量、已用量与重置时间；只有订阅 Key 能查，按量付费 Key 会被拒绝并给出可读说明。',
   'settings.cap.image': 'minimax_generate_image 文生图\n输入：prompt（必填，最多 60000 字），可选 model、n（1–4，默认 1）。\n产出：1–4 张本地图片路径。未保存时返回任务状态，不会自动再生成。',
   'settings.cap.imageEdit': 'minimax_edit_image 图生图\n输入：prompt，以及 1–5 张参考图（image_url、image_urls，或已保存图片任务）。本地文件超过 8MB 时改用 HTTPS 地址。\n产出：编辑后的本地图片。',
   'settings.cap.video': 'minimax_generate_video 文生视频 / 图生视频\n输入：prompt，可选 duration（1–15 秒，默认 2）。图生视频再加一张静帧 image_url，或已保存图片任务。\n产出：任务 id，状态为生成中。成片要用 minimax_media_status 取回，得到本地 MP4。',
@@ -262,6 +263,7 @@ export const en = {
   'settings.cap.seeChat': 'Chat and the model catalog belong to the minimax-byapi component. Connection, key, and model settings are on the plugin page.',
   'settings.cap.chat': 'Chat\nInput: a MiniMax chat model from the picker, plus the current message.\nOutput: a streaming reply. Only chat models appear in the picker.',
   'settings.cap.models': 'minimax_models\nInput: optional refresh, and verify_key. The key itself is not returned.\nOutput: model IDs grouped as chat, image, video, speech, and music.',
+  'settings.cap.quota': 'minimax_quota\nInput: none.\nOutput: remaining and used quota with reset times for the M Plan 5-hour and weekly windows. Only a subscription key can query it; a pay-as-you-go key is refused with a readable explanation.',
   'settings.cap.image': 'minimax_generate_image, text to image\nInput: prompt (required, up to 60000 characters), optional model and n (1-4, default 1).\nOutput: 1-4 local image paths. If it is not saved, the task status is returned and nothing is generated again.',
   'settings.cap.imageEdit': 'minimax_edit_image, image to image\nInput: prompt, plus 1-5 reference images (image_url, image_urls, or a saved image task). A local file over 8MB must be an HTTPS URL.\nOutput: the edited image, saved locally.',
   'settings.cap.video': 'minimax_generate_video, text to video or image to video\nInput: prompt, optional duration (1-15 seconds, default 2). Image to video also takes one still via image_url or a saved image task.\nOutput: a task id with status generating. Call minimax_media_status to save the MP4.',
@@ -441,7 +443,7 @@ function SavedFiles({ files, openFile }) {
     style: { ...snap.file, cursor: openFile ? 'pointer' : 'default' },
   }, fileName(file.path))));
 }
-const tools = ['minimax_models', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_list_voices', 'minimax_speak', 'minimax_speak_long', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
+const tools = ['minimax_models', 'minimax_quota', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_list_voices', 'minimax_speak', 'minimax_speak_long', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
 
 export function resultValue(block) {
   try { return JSON.parse((block?.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n')); }
@@ -514,7 +516,7 @@ function keyFailureOf(draft, t) {
 const SIZE_UNITS = { '': 1, k: 1000, m: 1000000 };
 // 思考强度是模型覆盖项里可选的档位；MiniMax 没有公开按模型分档的默认值，所以默认全不勾。
 const ALL_EFFORTS = EFFORT_ORDER;
-const CHAT_CAPABILITY_KEYS = ['settings.cap.chat', 'settings.cap.models', 'settings.cap.seeMedia'];
+const CHAT_CAPABILITY_KEYS = ['settings.cap.chat', 'settings.cap.models', 'settings.cap.quota', 'settings.cap.seeMedia'];
 const MEDIA_CAPABILITY_KEYS = ['settings.cap.image', 'settings.cap.imageEdit', 'settings.cap.video', 'settings.cap.voices', 'settings.cap.speech', 'settings.cap.speechLong', 'settings.cap.transcribe', 'settings.cap.music', 'settings.cap.status', 'settings.cap.retry', 'settings.cap.list', 'settings.cap.watch', 'settings.cap.player', 'settings.cap.unsupported', 'settings.cap.seeChat'];
 // 媒体模型下拉按类别筛选：优先用上游给的类别，没有类别时按模型 ID 的常见命名判断。
 // 兜底命名覆盖 MiniMax 官方在用的模型名：image-01、speech-2.8-hd、music-3.0、MiniMax-H3 等。
