@@ -43,7 +43,24 @@ First release. The plugin is renamed and reworked from the previous Grok gateway
 
 ## 未发布（Unreleased）
 
-Nothing yet. Unreleased changes are collected here before the next version tag.
+Corrections made after the first release text was written, checked against the official API reference (`platform.minimax.cn/docs/api-reference`).
+
+### Fixed
+
+- **Text parameters on the Anthropic-compatible route.** pi-ai's default thinking form (`type: "enabled"` with `budget_tokens`) is not accepted by MiniMax; the plugin now forces adaptive thinking, so the request carries `thinking: { type: "adaptive" }` and `output_config.effort` instead. Verified by a request-body test.
+- **Missing H3 video variants.** `MiniMax-H3-Highspeed` and `MiniMax-H3-Lite` were absent from the built-in catalog, so they could not be selected even though the v2 endpoint serves them.
+- **`image-01-live` was described as image-to-image only.** The official OpenAPI allows it for text-to-image and gives it a `style` object; the note is corrected and the style parameters are exposed.
+
+### Added
+
+- `reasoning_effort` is now sent explicitly with `supportsReasoningEffort` on the Chat Completions route, and the output cap always uses `max_completion_tokens` (the deprecated `max_tokens` is never sent). Covered by a request-body test.
+- Image parameters: `style_type` / `style_weight` for `image-01-live`, an explicit `width` / `height` pair for `image-01`, and `aigc_watermark` for images and videos. Local validation rejects a style on the wrong model, `21:9` on `image-01-live`, and an unpaired or out-of-range pixel size.
+- Video v2 parameters: `aigc_watermark`, `prompt_expansion_mode` (MiniMax-H3-Max only), the per-model resolution and duration rules, and the ratio rules — text-to-video requires a concrete ratio, image-to-video is fixed to `adaptive`, and `MiniMax-H3-Lite` rejects `adaptive`. The v2 prompt limit is 7000 characters while v1 stays at 2000.
+- A "Text model parameters" section in both READMEs and the parameter table in `VALIDATION.md`, listing what the plugin controls and what the adapter cannot send (`service_tier`, `reasoning_split`, disabling thinking on MiniMax-M3, text `seed`).
+
+### Changed
+
+- Image width/height versus aspect ratio: the official rule is that `aspect_ratio` wins when both are given; the plugin instead honours the explicit pixel size and stops sending `aspect_ratio`, so an explicit value is never silently dropped. Documented in both READMEs.
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [semantic versioning]: https://semver.org/spec/v2.0.0.html

@@ -46,6 +46,7 @@ npm pack --dry-run --ignore-scripts
   - 插件页显示 **MiniMax ByAPI v0.1.0** 为启用状态，组件 `minimax-byapi` 与 `dsh-minimax-media` 均为「运行中」。
   - 设置页正常渲染：接入方式（5 项）、API 地址、API 协议（Chat Completions / Responses / Anthropic Messages）、API Key、获取模型 / 保存地址和密钥、对话模型与媒体模型折叠区。
   - 该 profile 未配置真实 Key，因此模型选择器为空、对话与媒体请求未发起；这两项仍属未验证。
+  - 参数改造后二次复验（同一天、同一 profile，`link:` 安装随源码更新）：插件详情页正常打开，两个组件仍为「运行中」，接入方式下拉 5 项（含「订阅 M Plan（国际/国内）」）、API 协议下拉 3 项，浏览器控制台无 error / warn。
 
 ### 已实测的行为要点
 
