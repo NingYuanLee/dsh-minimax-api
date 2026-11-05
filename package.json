@@ -1,0 +1,103 @@
+{
+  "name": "dsh-minimax-byapi",
+  "version": "0.1.0",
+  "displayName": "MiniMax ByAPI",
+  "description": "Native MiniMax for DeepSeek Harness: chat with a subscription (Coding Plan) key or a pay-as-you-go API key, plus image, video, speech and music generation over the official MiniMax API.",
+  "license": "MIT",
+  "author": "NingYuanLee",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./catalog": "./src/catalog.js",
+    "./media": "./src/media-entry.js",
+    "./client": "./lib/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./media/icon": "./assets/media.svg",
+    "./media/locale/*.json": "./locale/media/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "assets",
+    "icon.svg",
+    "lib/client.js",
+    "scripts/build-client.mjs",
+    "cordis.patch.yml",
+    "locale",
+    "LICENSE",
+    "CHANGELOG.md",
+    "README.md",
+    "README.zh.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "prepack": "npm run build",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/index.js && node --check src/adapter.js && node --check src/catalog.js && node --check src/lock.js && node --check src/media.js && node --check src/media-entry.js && node --check src/minimax-api.js && node --check src/service.js && node --check src/client.js && node --check scripts/build-client.mjs",
+    "prepublishOnly": "npm test && npm run check"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NingYuanLee/dsh-minimax-byapi.git"
+  },
+  "homepage": "https://github.com/NingYuanLee/dsh-minimax-byapi#readme",
+  "bugs": {
+    "url": "https://github.com/NingYuanLee/dsh-minimax-byapi/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "minimax",
+    "minimax-m2",
+    "minimax-m3",
+    "llm-provider",
+    "ai-agent",
+    "image-generation",
+    "video-generation",
+    "text-to-speech",
+    "music-generation",
+    "anthropic-compatible",
+    "openai-compatible"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "tag": "latest"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-settings-controller"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-credentials": ">=0.2.1-0 <0.3.0",
+    "@deepseek-ai/dsh-llm-pi-ai": ">=0.2.1-0 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-0 <0.3.0",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-llm": ">=0.2.1-0 <0.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1"
+  },
+  "icon": "./icon.svg"
+}

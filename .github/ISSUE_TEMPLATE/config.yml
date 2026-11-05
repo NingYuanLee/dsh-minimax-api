@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: DeepSeek Harness community
+    url: https://github.com/deepseek-ai/deepseek-harness/discussions
+    about: General DSH questions, plugin development help, and feedback on DSH itself.
+  - name: Security report
+    url: https://github.com/NingYuanLee/dsh-minimax-byapi/security/advisories/new
+    about: Report a vulnerability privately.

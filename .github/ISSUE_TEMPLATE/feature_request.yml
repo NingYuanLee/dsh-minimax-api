@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest a capability or an improvement
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the plugin does not support today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: false
+  - type: textarea
+    id: upstream
+    attributes:
+      label: Upstream capability
+      description: If this needs a gateway endpoint or model, name it and link the provider documentation.
+    validations:
+      required: false
