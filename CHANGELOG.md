@@ -47,6 +47,7 @@ Corrections made after the first release text was written, checked against the o
 
 ### Fixed
 
+- **The API address now follows the protocol.** On the official hosts `/v1` and `/anthropic` are paired with the OpenAI-compatible and Anthropic-compatible protocols; switching the protocol rewrites the path and re-derives the access mode from the address-plus-protocol pair, so the settings page can no longer produce "`/v1` with `anthropic-messages`". Custom endpoints are left untouched.
 - **Text parameters on the Anthropic-compatible route.** pi-ai's default thinking form (`type: "enabled"` with `budget_tokens`) is not accepted by MiniMax; the plugin now forces adaptive thinking, so the request carries `thinking: { type: "adaptive" }` and `output_config.effort` instead. Verified by a request-body test.
 - **Missing H3 video variants.** `MiniMax-H3-Highspeed` and `MiniMax-H3-Lite` were absent from the built-in catalog, so they could not be selected even though the v2 endpoint serves them.
 - **`image-01-live` was described as image-to-image only.** The official OpenAPI allows it for text-to-image and gives it a `style` object; the note is corrected and the style parameters are exposed.

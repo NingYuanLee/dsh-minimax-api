@@ -79,6 +79,10 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 | `coding-cn` —— M Plan（国内） | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
 | `custom` —— 自定义地址 | 空 | `openai-completions` |
 
+官方主机上地址与协议是配对的：`/v1` 说 OpenAI 兼容，`/anthropic` 说 Anthropic 兼容。在设置页切换协议会自动把地址改成对应路径，切换接入方式则两者一起填；自定义地址不会被改写。
+
+**官方推荐 Anthropic 兼容通道**（文档里标注「推荐」，SDK 示例也以它为主）。它用同一把 Bearer Key 提供同样两款模型，而且是唯一让思考深度走 `output_config.effort` 的通道。想按推荐默认值用，选 `coding-global` / `coding-cn`；两类 Key 在这条通道上都能用。
+
 ## 安装
 
 **从 git 安装（发布到 npm 前的推荐方式）：**

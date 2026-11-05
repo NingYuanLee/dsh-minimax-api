@@ -79,6 +79,10 @@ The legacy China host `api.minimaxi.com` still answers, but the current document
 | `coding-cn` — M Plan, China | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
 | `custom` — bring your own endpoint | empty | `openai-completions` |
 
+On the official hosts the address and the protocol are paired: `/v1` speaks OpenAI-compatible, `/anthropic` speaks Anthropic-compatible. Changing the protocol in the settings page rewrites the path for you, and changing an access preset fills both. Custom endpoints are never rewritten.
+
+**MiniMax recommends the Anthropic-compatible route** (the docs label it "recommended" and the SDK examples lead with it). It serves the same two models with the same bearer key, and it is the only route where the thinking depth travels as `output_config.effort`. Use `coding-global` / `coding-cn` if you want that default; both key types work there.
+
 ## Install
 
 **From git (recommended until the package reaches npm):**

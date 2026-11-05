@@ -16,6 +16,10 @@
 
 对话协议可选 `openai-completions`、`openai-responses`、`anthropic-messages` 三种。走 Chat Completions 时插件使用 MiniMax 的兼容开关：`max_completion_tokens`（而非已废弃的 `max_tokens`）与 `reasoning_content` 思考字段；Responses 与 Anthropic 通道不接受这两个兼容开关，因此插件只在 `openai-completions` 下启用它们。
 
+官方主机上地址前缀与协议是配对的：`/v1` 对应 OpenAI 兼容（`openai-completions` / `openai-responses`），`/anthropic` 对应 `anthropic-messages`。设置页切换协议时会自动把官方地址换成对应路径，并按「地址 + 协议」重新判定接入方式（两者都命中预设才算预设，否则标为 `custom`）；自建地址不会被改写。
+
+**官方推荐 Anthropic 兼容通道**：文档标注「推荐」，SDK 示例也以 Anthropic 为主，而且它是唯一让思考深度走 `output_config.effort` 的通道。想用推荐默认值就选 `coding-global` / `coding-cn`，订阅 Key 与按量付费 Key 都能用。
+
 > 国内旧域名 `api.minimaxi.com` 目前仍会应答，但官方文档已切换到 `api.minimax.cn`。请优先使用 `api.minimax.cn` 预设；确实需要旧域名时，用 `custom` 预设手填地址。
 
 地址规整规则（`src/catalog.js` 的 `normalizeBaseURL`）：

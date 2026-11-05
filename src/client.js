@@ -63,6 +63,7 @@ export const zh = {
   'settings.plan.coding-cn': '订阅 M Plan（国内）',
   'settings.plan.custom': '自定义',
   'settings.plan.hint': '选好接入方式会自动填入 API 地址和协议，之后仍然可以手动修改。',
+  'settings.protocolHint': '官方主机上协议与地址是配对的：OpenAI 兼容用 /v1，Anthropic 兼容用 /anthropic；切换协议会自动把地址改成对应路径。官方推荐 Anthropic 兼容（M Plan 订阅 Key 与按量付费 Key 都可用）。',
   'settings.apiAddress': 'API 地址',
   'settings.apiProtocol': 'API 协议',
   'settings.apiKey': 'API Key',
@@ -208,6 +209,7 @@ export const en = {
   'settings.plan.coding-cn': 'M Plan subscription (China)',
   'settings.plan.custom': 'Custom',
   'settings.plan.hint': 'Picking an access mode fills in the API address and protocol; both stay editable afterwards.',
+  'settings.protocolHint': 'On the official hosts the protocol and the address are paired: OpenAI-compatible uses /v1, Anthropic-compatible uses /anthropic, and switching the protocol rewrites the path for you. MiniMax recommends the Anthropic-compatible route, which works with both an M Plan key and a pay-as-you-go key.',
   'settings.apiAddress': 'API address',
   'settings.apiProtocol': 'API protocol',
   'settings.apiKey': 'API key',
@@ -336,6 +338,8 @@ const ACCESS_PLANS = [
   { id: 'custom', baseURL: '', api: '' },
 ];
 const API_PROTOCOLS = ['openai-completions', 'openai-responses', 'anthropic-messages'];
+// 官方主机：只有这两个域名的地址前缀与协议是配对的，其他自建代理不改写。
+const MINIMAX_API_HOSTS = ['api.minimax.io', 'api.minimax.cn'];
 function planById(id) {
   return ACCESS_PLANS.find(plan => plan.id === id);
 }
@@ -699,6 +703,28 @@ export function MinimaxSettings(props) {
     else { connection.plan = plan.id; connection.baseURL = plan.baseURL; connection.api = plan.api; }
     setDraft({ ...value, connection });
   }
+  // 官方主机上协议与地址前缀是配对的：OpenAI 兼容走 /v1，Anthropic 兼容走 /anthropic。
+  // 切协议时把地址一起换掉，避免出现「地址是 /v1 却按 Anthropic 协议发请求」的组合。
+  function protocolBaseURL(baseURL, api) {
+    let url;
+    try { url = new URL(baseURL); } catch { return baseURL; }
+    if (!MINIMAX_API_HOSTS.includes(url.hostname)) return baseURL;
+    const path = url.pathname.replace(/\/+$/, '');
+    if (path !== '' && path !== '/v1' && path !== '/anthropic') return baseURL;
+    url.pathname = api === 'anthropic-messages' ? '/anthropic' : '/v1';
+    return url.href.replace(/\/$/, '');
+  }
+  function applyProtocol(nextApi) {
+    const connection = { ...(value.connection || {}) };
+    const swapped = protocolBaseURL(resolveBaseURL(value), nextApi);
+    connection.api = nextApi;
+    connection.baseURL = swapped;
+    const normalized = swapped.replace(/\/+$/, '');
+    // 预设同时约束地址与协议：只有两者都匹配才算那个接入方式，否则算自定义。
+    const matched = ACCESS_PLANS.find(plan => plan.baseURL && plan.baseURL.replace(/\/+$/, '') === normalized && plan.api === nextApi);
+    connection.plan = matched && matched.id !== 'custom' ? matched.id : 'custom';
+    setDraft({ ...value, connection });
+  }
 
   const mediaOptions = (category, key) => {
     const saved = (value.modelOverrides || [])
@@ -931,12 +957,13 @@ export function MinimaxSettings(props) {
           h('select', {
             value: apiId,
             disabled: busy, 'aria-label': t('settings.apiProtocol'),
-            onChange: event => setDraft({ ...value, connection: { ...value.connection, api: event.target.value } }),
+            onChange: event => applyProtocol(event.target.value),
             style: ui.control,
           },
           h('option', { value: 'openai-completions' }, 'Chat Completions'),
           h('option', { value: 'openai-responses' }, 'Responses'),
           h('option', { value: 'anthropic-messages' }, 'Anthropic Messages')))),
+      h('p', { style: ui.hint }, t('settings.protocolHint')),
       h('label', { style: ui.label }, t('settings.apiKey'),
         h('input', { type: 'password', autoComplete: 'new-password', value: keyDraft, disabled: busy, placeholder: t('settings.apiKeyPlaceholder'),
           'aria-label': t('settings.apiKey'), onChange: event => setKeyDraft(event.target.value), style: ui.control })),
