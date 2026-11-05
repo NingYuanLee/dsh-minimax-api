@@ -9,12 +9,12 @@
 | 预设 | 适用 | API 地址 | 对话协议 |
 | --- | --- | --- | --- |
 | `payg-global` | 按量付费，国际站 | `https://api.minimax.io/v1` | `openai-completions` |
-| `payg-cn` | 按量付费，国内站 | `https://api.minimax.cn/v1` | `openai-completions` |
+| `payg-cn` | 按量付费，国内站 | `https://api.minimaxi.com/v1` | `openai-completions` |
 | `coding-global` | M Plan 订阅，国际站 | `https://api.minimax.io/anthropic` | `anthropic-messages` |
-| `coding-cn` | M Plan 订阅，国内站 | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
+| `coding-cn` | M Plan 订阅，国内站 | `https://api.minimaxi.com/anthropic` | `anthropic-messages` |
 | `custom` | 自建网关或其他端点 | 留空手填 | `openai-completions`（可改） |
 
-默认接入方式是 **`coding-cn`**（国内 M Plan + `anthropic-messages`），即首次打开就指向 `https://api.minimax.cn/anthropic`。设置页把协议选择放在地址左边，改协议时会自动改写官方地址的路径。
+默认接入方式是 **`coding-cn`**（国内 M Plan + `anthropic-messages`），即首次打开就指向 `https://api.minimaxi.com/anthropic`。设置页把协议选择放在地址左边，改协议时会自动改写官方地址的路径。
 
 对话协议可选 `openai-completions`、`openai-responses`、`anthropic-messages` 三种。走 Chat Completions 时插件使用 MiniMax 的兼容开关：`max_completion_tokens`（而非已废弃的 `max_tokens`）与 `reasoning_content` 思考字段；Responses 与 Anthropic 通道不接受这两个兼容开关，因此插件只在 `openai-completions` 下启用它们。
 
@@ -22,7 +22,7 @@
 
 **官方推荐 Anthropic 兼容通道**：文档标注「推荐」，SDK 示例也以 Anthropic 为主，而且它是唯一让思考深度走 `output_config.effort` 的通道。想用推荐默认值就选 `coding-global` / `coding-cn`，订阅 Key 与按量付费 Key 都能用。
 
-> 国内旧域名 `api.minimaxi.com` 目前仍会应答，但官方文档已切换到 `api.minimax.cn`。请优先使用 `api.minimax.cn` 预设；确实需要旧域名时，用 `custom` 预设手填地址。
+> 国内两个官方域名等价：`api.minimaxi.com`（插件默认）与 `api.minimax.cn`（当前国内 OpenAPI 规范列出的域名）。对话、媒体与额度查询在两者上行为一致，需要另一个写法时用 `custom` 预设手填。
 
 地址规整规则（`src/catalog.js` 的 `normalizeBaseURL`）：
 
@@ -93,7 +93,7 @@ M Plan 用户访问已退役模型时会被服务端自动路由到 `MiniMax-M3.
 curl 'https://www.minimax.io/v1/token_plan/remains' -H 'Authorization: Bearer <订阅 Key>'
 ```
 
-- 主机是 **www**（`www.minimax.io` / `www.minimax.cn`），与对话用的 `api.*` 主机不同；插件按当前 API 地址推出对应 www 主机，自定义地址则直接报错。
+- 主机是 **www**（`www.minimax.io` / `www.minimaxi.com` / `www.minimax.cn`），与对话用的 `api.*` 主机不同；插件按当前 API 地址推出对应 www 主机，自定义地址则直接报错。
 - **必须用订阅 Key**；按量付费 Key 会被拒绝（那种计费没有 M Plan 额度）。
 - 文本、图像、语音等非视频能力受 5 小时窗口 + 周窗口限制；视频只受周窗口限制；额度不结转。
 - 上游没有公开字段表，`current_*_usage_count` 的语义在社区 issue 里被记为「剩余」而非「已用」。插件的 `normalizeQuota` 按剩余解析，遇到 `usage > total` 时回退成已用解读，并原样返回 `raw` 便于人工核对。

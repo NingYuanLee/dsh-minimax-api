@@ -47,7 +47,7 @@ Not provided: realtime voice conversation (audio-in / audio-out), voice cloning,
 | --- | --- | --- |
 | dsh | `>=0.2.1-rc.2 <0.3.0-0` via `engines.dsh` | `0.2.2-rc.1` in an isolated Web profile: install, load, both components running, settings page rendered. Chat and media calls still need a real key — see [VALIDATION.md](VALIDATION.md) |
 | Node.js | `>=22.19.0` | CI runs Node 22.19 and 24 on Linux and Windows |
-| MiniMax | Official open platform, international (`api.minimax.io`) or China (`api.minimax.cn`) | Documented endpoints only; no live call with a real key yet |
+| MiniMax | Official open platform, international (`api.minimax.io`) or China (`api.minimaxi.com` / `api.minimax.cn`) | Documented endpoints only; no live call with a real key yet |
 | Other dsh 0.2.x | Inside the `engines.dsh` range | Not individually verified |
 
 `engines.dsh` is the compatibility gate; `peerDependencies` pin the SDK packages the source uses but do not decide compatibility, so rerun the integration tests after a dsh upgrade.
@@ -66,7 +66,7 @@ MiniMax issues two kinds of credential, and the plugin treats them the same way 
 
 Both key types speak the same protocol; only the billing source and the available model tiers differ. The plugin stores the key in the dsh credential service under the reference name `MINIMAX_API_KEY` and never writes it into the configuration.
 
-The legacy China host `api.minimaxi.com` still answers, but the current documentation uses `api.minimax.cn` — prefer the `api.minimax.cn` preset.
+Both China hosts answer: `api.minimaxi.com` (the preset default) and `api.minimax.cn` (the host the current CN OpenAPI specs list). They behave identically for chat, media and quota; switch to `custom` if you need the other spelling.
 
 ### Access modes
 
@@ -75,14 +75,14 @@ The legacy China host `api.minimaxi.com` still answers, but the current document
 | Plan | Base URL | Chat protocol |
 | --- | --- | --- |
 | `payg-global` — pay-as-you-go, international | `https://api.minimax.io/v1` | `openai-completions` |
-| `payg-cn` — pay-as-you-go, China | `https://api.minimax.cn/v1` | `openai-completions` |
+| `payg-cn` — pay-as-you-go, China | `https://api.minimaxi.com/v1` | `openai-completions` |
 | `coding-global` — M Plan, international | `https://api.minimax.io/anthropic` | `anthropic-messages` |
-| `coding-cn` — M Plan, China | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
+| `coding-cn` — M Plan, China | `https://api.minimaxi.com/anthropic` | `anthropic-messages` |
 | `custom` — bring your own endpoint | empty | `openai-completions` |
 
 On the official hosts the address and the protocol are paired: `/v1` speaks OpenAI-compatible, `/anthropic` speaks Anthropic-compatible. Changing the protocol in the settings page rewrites the path for you, and changing an access preset fills both. Custom endpoints are never rewritten.
 
-The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fresh install points at `https://api.minimax.cn/anthropic` — the China M Plan route on MiniMax's recommended protocol.
+The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fresh install points at `https://api.minimaxi.com/anthropic` — the China M Plan route on MiniMax's recommended protocol.
 
 **MiniMax recommends the Anthropic-compatible route** (the docs label it "recommended" and the SDK examples lead with it). It serves the same two models with the same bearer key, and it is the only route where the thinking depth travels as `output_config.effort`. Use `coding-global` / `coding-cn` if you want that default; both key types work there.
 
@@ -157,7 +157,7 @@ Use the plugin settings page for normal setup. Manual configuration in the profi
   config:
     connection:
       plan: coding-cn
-      baseURL: https://api.minimax.cn/anthropic
+      baseURL: https://api.minimaxi.com/anthropic
       api: anthropic-messages
       apiKeyEnv: MINIMAX_API_KEY
       verify: true
@@ -173,7 +173,7 @@ Use the plugin settings page for normal setup. Manual configuration in the profi
 | Key | Default | Notes |
 | --- | --- | --- |
 | `connection.plan` | `coding-cn` | Access mode: `payg-global`, `payg-cn`, `coding-global`, `coding-cn`, `custom`. Fills `baseURL` and `api`. The default is the China M Plan route on the recommended Anthropic-compatible protocol. |
-| `connection.baseURL` | `https://api.minimax.cn/anthropic` | API address. Non-local addresses must be HTTPS; the path is normalized to `/v1` or `/anthropic`. |
+| `connection.baseURL` | `https://api.minimaxi.com/anthropic` | API address. Non-local addresses must be HTTPS; the path is normalized to `/v1` or `/anthropic`. |
 | `connection.apiKey` | empty | Direct key override for local testing; takes precedence over the credential. Leave empty in normal use. |
 | `connection.apiKeyEnv` | `MINIMAX_API_KEY` | Credential reference name in the dsh credential service. |
 | `connection.api` | `anthropic-messages` | Chat protocol: `openai-completions`, `openai-responses` or `anthropic-messages`. |
@@ -269,7 +269,7 @@ Installation is successful when all four checks pass:
 | --- | --- |
 | `dsh plugin add` fails or reports 404 | Use the git or local-checkout form above; the package is not on npm yet. |
 | Plugin is listed but does not load | Your dsh is outside `>=0.2.1-rc.2 <0.3.0-0`. Upgrade to a 0.2.x build. |
-| 401 or 403 in settings | Wrong key or base URL. Re-save the key and check the address preset (`api.minimax.io` vs `api.minimax.cn`). |
+| 401 or 403 in settings | Wrong key or base URL. Re-save the key and check the address preset (`api.minimax.io` vs `api.minimaxi.com`). |
 | "该地址没有开放模型列表接口" | That address does not expose `GET /v1/models`; the self-check is skipped and the built-in model constants are used. |
 | Connection refused or timeout | The endpoint is unreachable, or the account has no balance left. `timeoutMs` caps each request. |
 | No MiniMax models in the picker | `/v1/models` returned nothing classified as chat; refresh with `minimax_models` and add overrides. |

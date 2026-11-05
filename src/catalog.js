@@ -49,9 +49,9 @@ const MEDIA_BY_ID = new Map(MEDIA_MODELS.map(row => [row.id, row]));
 // 接入方式预设：订阅 Key（M Plan）与按量付费 Key 用同一套协议，差别只在地址、模型档位与计费。
 export const PLAN_PRESETS = {
   'payg-global': { baseURL: 'https://api.minimax.io/v1', api: 'openai-completions' },
-  'payg-cn': { baseURL: 'https://api.minimax.cn/v1', api: 'openai-completions' },
+  'payg-cn': { baseURL: 'https://api.minimaxi.com/v1', api: 'openai-completions' },
   'coding-global': { baseURL: 'https://api.minimax.io/anthropic', api: 'anthropic-messages' },
-  'coding-cn': { baseURL: 'https://api.minimax.cn/anthropic', api: 'anthropic-messages' },
+  'coding-cn': { baseURL: 'https://api.minimaxi.com/anthropic', api: 'anthropic-messages' },
   custom: { baseURL: '', api: 'openai-completions' },
 };
 

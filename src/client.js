@@ -331,18 +331,19 @@ const PROVIDER_ID = 'minimax-byapi';
 const PROVIDER_NAME = 'MiniMax';
 // 与 Config.connection.baseURL 的 schema 默认值一致（按量付费·国际）。详情页没有表单，首屏 connection 是空的。
 // 默认接入方式：国内 M Plan + Anthropic 兼容（官方推荐），与 src/catalog.js 的 DEFAULT_PLAN 保持一致。
-const DEFAULT_BASE_URL = 'https://api.minimax.cn/anthropic';
+const DEFAULT_BASE_URL = 'https://api.minimaxi.com/anthropic';
 // 接入方式：预设同时决定 API 地址和协议；custom 保留用户手填的值。
 const ACCESS_PLANS = [
   { id: 'payg-global', baseURL: 'https://api.minimax.io/v1', api: 'openai-completions' },
-  { id: 'payg-cn', baseURL: 'https://api.minimax.cn/v1', api: 'openai-completions' },
+  { id: 'payg-cn', baseURL: 'https://api.minimaxi.com/v1', api: 'openai-completions' },
   { id: 'coding-global', baseURL: 'https://api.minimax.io/anthropic', api: 'anthropic-messages' },
-  { id: 'coding-cn', baseURL: 'https://api.minimax.cn/anthropic', api: 'anthropic-messages' },
+  { id: 'coding-cn', baseURL: 'https://api.minimaxi.com/anthropic', api: 'anthropic-messages' },
   { id: 'custom', baseURL: '', api: '' },
 ];
 const API_PROTOCOLS = ['openai-completions', 'openai-responses', 'anthropic-messages'];
-// 官方主机：只有这两个域名的地址前缀与协议是配对的，其他自建代理不改写。
-const MINIMAX_API_HOSTS = ['api.minimax.io', 'api.minimax.cn'];
+// 官方主机：只有这些域名的地址前缀与协议是配对的，其他自建代理不改写。
+// 国内两个官方域名等价（api.minimaxi.com 与 api.minimax.cn 都能用），默认用 minimaxi.com。
+const MINIMAX_API_HOSTS = ['api.minimax.io', 'api.minimax.cn', 'api.minimaxi.com'];
 function planById(id) {
   return ACCESS_PLANS.find(plan => plan.id === id);
 }

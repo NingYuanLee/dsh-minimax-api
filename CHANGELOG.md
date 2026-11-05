@@ -47,7 +47,7 @@ Corrections made after the first release text was written, checked against the o
 
 ### Changed
 
-- The default access mode is now `coding-cn` with `anthropic-messages`: a fresh install points at `https://api.minimax.cn/anthropic`, the China M Plan route on the protocol MiniMax recommends. `connection.baseURL` and `connection.api` follow that default.
+- The default access mode is now `coding-cn` with `anthropic-messages`: a fresh install points at `https://api.minimaxi.com/anthropic`, the China M Plan route on the protocol MiniMax recommends. `connection.baseURL` and `connection.api` follow that default. Both China hosts answer identically (`api.minimaxi.com` and `api.minimax.cn`); the preset uses `api.minimaxi.com`, and switching to the other spelling is a `custom` address.
 - The settings page puts the API protocol selector to the left of the address field, and changing it rewrites the official address path.
 - Image width/height versus aspect ratio: the official rule is that `aspect_ratio` wins when both are given; the plugin instead honours the explicit pixel size and stops sending `aspect_ratio`, so an explicit value is never silently dropped. Documented in both READMEs.
 

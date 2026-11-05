@@ -47,7 +47,7 @@
 | --- | --- | --- |
 | dsh | `engines.dsh` 要求 `>=0.2.1-rc.2 <0.3.0-0` | 已在 `0.2.2-rc.1` 的独立 Web profile 实测安装、加载、两个组件运行与设置页渲染；对话与媒体调用仍需真实 Key —— 见 [VALIDATION.md](VALIDATION.md) |
 | Node.js | `>=22.19.0` | CI 在 Linux 与 Windows 上跑 Node 22.19 与 24 |
-| MiniMax | 官方开放平台，国际 `api.minimax.io` 或国内 `api.minimax.cn` | 仅依据官方文档，尚未用真实 Key 实测调用 |
+| MiniMax | 官方开放平台，国际 `api.minimax.io` 或国内 `api.minimaxi.com` / `api.minimax.cn` | 仅依据官方文档，尚未用真实 Key 实测调用 |
 | 其他 dsh 0.2.x | 在 `engines.dsh` 区间内 | 未逐版本验证 |
 
 `engines.dsh` 是兼容性闸门；`peerDependencies` 只固定源码用到的 SDK 包，不决定兼容性，dsh 升级后需要重跑集成测试。
@@ -66,7 +66,7 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 
 两类 Key 使用同一套协议，差别只在计费来源与可用模型档位。插件把 Key 存在 dsh 凭据服务中，引用名固定为 `MINIMAX_API_KEY`，配置里不落明文。
 
-国内旧域名 `api.minimaxi.com` 目前仍可访问，但官方文档已切换到 `api.minimax.cn`，请优先使用 `api.minimax.cn` 预设。
+国内两个官方域名等价：`api.minimaxi.com`（预设默认）与 `api.minimax.cn`（当前国内 OpenAPI 规范列出的域名）。对话、媒体与额度查询在两者上行为一致；需要另一个写法时用 `custom` 手填。
 
 ### 接入方式
 
@@ -75,14 +75,14 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 | 预设 | API 地址 | 对话协议 |
 | --- | --- | --- |
 | `payg-global` —— 按量付费（国际） | `https://api.minimax.io/v1` | `openai-completions` |
-| `payg-cn` —— 按量付费（国内） | `https://api.minimax.cn/v1` | `openai-completions` |
+| `payg-cn` —— 按量付费（国内） | `https://api.minimaxi.com/v1` | `openai-completions` |
 | `coding-global` —— M Plan（国际） | `https://api.minimax.io/anthropic` | `anthropic-messages` |
-| `coding-cn` —— M Plan（国内） | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
+| `coding-cn` —— M Plan（国内） | `https://api.minimaxi.com/anthropic` | `anthropic-messages` |
 | `custom` —— 自定义地址 | 空 | `openai-completions` |
 
 官方主机上地址与协议是配对的：`/v1` 说 OpenAI 兼容，`/anthropic` 说 Anthropic 兼容。在设置页切换协议会自动把地址改成对应路径，切换接入方式则两者一起填；自定义地址不会被改写。
 
-设置页默认就是 **`coding-cn` + `anthropic-messages`**，即新装好就指向 `https://api.minimax.cn/anthropic`——国内 M Plan 走官方推荐协议。协议选择在地址左边，改协议时地址会跟着换。
+设置页默认就是 **`coding-cn` + `anthropic-messages`**，即新装好就指向 `https://api.minimaxi.com/anthropic`——国内 M Plan 走官方推荐协议。协议选择在地址左边，改协议时地址会跟着换。
 
 **官方推荐 Anthropic 兼容通道**（文档里标注「推荐」，SDK 示例也以它为主）。它用同一把 Bearer Key 提供同样两款模型，而且是唯一让思考深度走 `output_config.effort` 的通道。想按推荐默认值用，选 `coding-global` / `coding-cn`；两类 Key 在这条通道上都能用。
 
@@ -157,7 +157,7 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
   config:
     connection:
       plan: coding-cn
-      baseURL: https://api.minimax.cn/anthropic
+      baseURL: https://api.minimaxi.com/anthropic
       api: anthropic-messages
       apiKeyEnv: MINIMAX_API_KEY
       verify: true
@@ -173,7 +173,7 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `connection.plan` | `coding-cn` | 接入方式：`payg-global`、`payg-cn`、`coding-global`、`coding-cn`、`custom`，用于填 `baseURL` 与 `api`。默认是国内 M Plan + 官方推荐的 Anthropic 兼容。 |
-| `connection.baseURL` | `https://api.minimax.cn/anthropic` | API 地址。非本机地址必须使用 HTTPS，路径会被规整成 `/v1` 或 `/anthropic`。 |
+| `connection.baseURL` | `https://api.minimaxi.com/anthropic` | API 地址。非本机地址必须使用 HTTPS，路径会被规整成 `/v1` 或 `/anthropic`。 |
 | `connection.apiKey` | 空 | 直接填写调用密钥，优先于凭据引用。仅供本地测试，正常使用请留空。 |
 | `connection.apiKeyEnv` | `MINIMAX_API_KEY` | dsh 凭据服务中的引用名。 |
 | `connection.api` | `anthropic-messages` | 对话协议：`openai-completions`、`openai-responses` 或 `anthropic-messages`。 |
@@ -269,7 +269,7 @@ MiniMax 已退役音乐模型，并且自 **2026-08-20** 起音乐 API 不再向
 | --- | --- |
 | `dsh plugin add` 失败或报 404 | 改用上面的 git 或本地目录方式；包还没有发布到 npm。 |
 | 插件已列出但加载不了 | 你的 dsh 不在 `>=0.2.1-rc.2 <0.3.0-0` 区间，升级到 0.2.x 版本。 |
-| 设置页报 401 或 403 | Key 或地址不对。重新保存 Key，并核对预设地址（`api.minimax.io` 还是 `api.minimax.cn`）。 |
+| 设置页报 401 或 403 | Key 或地址不对。重新保存 Key，并核对预设地址（`api.minimax.io` 还是 `api.minimaxi.com`）。 |
 | 提示「该地址没有开放模型列表接口」 | 该地址没有开放 `GET /v1/models`，自检会被跳过，改用内置模型常量。 |
 | 连接被拒或超时 | 端点不可达，或账户余额不足。`timeoutMs` 决定单次请求上限。 |
 | 模型选择器里没有 MiniMax 模型 | `/v1/models` 返回的内容没有被分类为 chat；用 `minimax_models` 刷新并补覆盖项。 |

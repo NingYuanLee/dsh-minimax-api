@@ -167,17 +167,17 @@ test('接入方式下拉列出五个选项，默认国内 M Plan（Anthropic 兼
   assert.deepEqual(options, ['payg-global', 'payg-cn', 'coding-global', 'coding-cn', 'custom']);
   assert.match(textsOf(current()), /订阅 M Plan（国内）/);
   assert.equal(byLabel(current(), 'API 协议').props.value, 'anthropic-messages', '默认协议是官方推荐的 Anthropic 兼容');
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/anthropic');
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimaxi.com/anthropic');
 });
 
 test('选接入方式会同时填入地址和协议；选自定义不清空已填的值', () => {
   const Client = loadClient();
   const current = mountSettings(Client);
   byLabel(current(), '接入方式').props.onChange({ target: { value: 'coding-cn' } });
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/anthropic');
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimaxi.com/anthropic');
   assert.equal(byLabel(current(), 'API 协议').props.value, 'anthropic-messages');
   byLabel(current(), '接入方式').props.onChange({ target: { value: 'custom' } });
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/anthropic', '选自定义不清空地址');
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimaxi.com/anthropic', '选自定义不清空地址');
   assert.equal(byLabel(current(), 'API 协议').props.value, 'anthropic-messages', '选自定义不清空协议');
   assert.equal(byLabel(current(), '接入方式').props.value, 'custom');
 });
