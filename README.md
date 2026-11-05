@@ -21,15 +21,17 @@ One plugin, one MiniMax connection. Chat models appear in the model picker; imag
 | Durable media tasks | Task records are per session and survive restarts. Downloads write `.part` files and are renamed after validation. A failed download can be retried without regenerating, so nothing is billed twice. |
 | Results in chat | Tool result cards, file preview, and a sidebar player for MP4, MP3 and WAV. Tool cards and the player follow the dsh language. |
 
-The plugin registers two components: `minimax-byapi` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 10 tools:
+The plugin registers two components: `minimax-byapi` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 12 tools:
 
 | Tool | What it does |
 | --- | --- |
 | `minimax_models` | Refreshes the catalog and returns models grouped by capability. Optional `verify_key` checks address and key with one `GET /v1/models`. |
-| `minimax_generate_image` | Text to image: `prompt`, optional `model`, aspect ratio, `n` (1–9, default 1). |
+| `minimax_generate_image` | Text to image: `prompt`, optional `model`, aspect ratio, `n` (1–9, default 1), style settings for `image-01-live`. |
 | `minimax_edit_image` | Image to image: `prompt` plus a reference image (`subject_reference`). |
 | `minimax_generate_video` | Text to video. V2 models (MiniMax-H3 family) run 4–15 s; V1 models (Hailuo family) run 6 s or 10 s. |
-| `minimax_speak` | Text to speech: `input`, optional `model` and `voice`. |
+| `minimax_list_voices` | Lists the `voice_id` values this account can use (`system` / `voice_cloning` / `voice_generation` / `all`). |
+| `minimax_speak` | Synchronous text to speech: `text` up to 10000 characters, optional `model`, `voice_id`, speed, volume, pitch, emotion and format. |
+| `minimax_speak_long` | Asynchronous long-form speech: `text` up to 100000 characters, returns a task id to fetch with `minimax_media_status`. |
 | `minimax_transcribe` | Speech to text: uploads an audio file and returns the transcript. |
 | `minimax_generate_music` | Text to music. Retired by MiniMax — see [Music](#music-is-retired). |
 | `minimax_media_list` | Lists media tasks created in the current session. |
@@ -121,7 +123,7 @@ Updating a git install means removing it and adding the new commit; local instal
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
 ```
 
-Removing the plugin takes its layers out of the profile: the provider, the 10 tools and the settings page are gone. Generated media and task records are **not** deleted, and the credential is **not** removed either. Delete the data directory yourself if you want the files gone:
+Removing the plugin takes its layers out of the profile: the provider, the 12 tools and the settings page are gone. Generated media and task records are **not** deleted, and the credential is **not** removed either. Delete the data directory yourself if you want the files gone:
 
 ```powershell
 Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
@@ -235,7 +237,7 @@ Installing any dsh plugin runs third-party code with your user permissions, and 
 - **Chat:** choose **MiniMax** in the model picker. Only chat models are listed; the settings page's model table is what the picker shows, so delete a row and save to hide that model.
 - **Images:** one call generates and saves; inline the result with an absolute local path — `![alt](<D:/path/result-1.png>)`. dsh Web serves it through `/api/file`; the limit is 20 MiB per file.
 - **Video:** submits a job. Call `minimax_media_status` with the returned `task_id` until the result is saved or the task failed; the status card does not refresh by itself. Do not resubmit a job whose submission status is unknown — that would be billed twice.
-- **Speech:** `minimax_speak` writes an audio file; `minimax_transcribe` uploads a local audio file and returns the transcript as text.
+- **Speech:** `minimax_speak` writes an audio file for text up to 10000 characters; `minimax_speak_long` submits an asynchronous job for long text and returns a task id to fetch with `minimax_media_status`; `minimax_list_voices` returns the `voice_id` values to pass to either. `minimax_transcribe` uploads a local audio file and returns the transcript as text.
 - **Display:** video and audio appear in the tool result card player. Do not inline them with Markdown image syntax — the chat does not render them and shows a broken image instead.
 
 ## Troubleshooting

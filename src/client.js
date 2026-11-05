@@ -118,8 +118,10 @@ export const zh = {
   'settings.cap.image': 'minimax_generate_image 文生图\n输入：prompt（必填，最多 60000 字），可选 model、n（1–4，默认 1）。\n产出：1–4 张本地图片路径。未保存时返回任务状态，不会自动再生成。',
   'settings.cap.imageEdit': 'minimax_edit_image 图生图\n输入：prompt，以及 1–5 张参考图（image_url、image_urls，或已保存图片任务）。本地文件超过 8MB 时改用 HTTPS 地址。\n产出：编辑后的本地图片。',
   'settings.cap.video': 'minimax_generate_video 文生视频 / 图生视频\n输入：prompt，可选 duration（1–15 秒，默认 2）。图生视频再加一张静帧 image_url，或已保存图片任务。\n产出：任务 id，状态为生成中。成片要用 minimax_media_status 取回，得到本地 MP4。',
-  'settings.cap.speech': 'minimax_speak 文字转语音\n输入：input（必填，最多 60000 字），可选 model、voice。\n产出：本地 MP3。不接受音频输入；语音转文字用 minimax_transcribe。',
-  'settings.cap.transcribe': 'minimax_transcribe 语音转文字\n输入：音频（image_url 之外的 audio 地址，或已保存的语音任务）。\n产出：转写文本，不产生媒体文件。',
+  'settings.cap.voices': 'minimax_list_voices 查询可用音色\n输入：可选 voice_type（system / voice_cloning / voice_generation / all，默认 system）。\n产出：可用 voice_id 列表（含名称与描述），可直接传给 minimax_speak 与 minimax_speak_long；不产生媒体文件。',
+  'settings.cap.speech': 'minimax_speak 同步文字转语音\n输入：text（必填，最多 10000 字），可选 model、voice_id、speed、vol、pitch、emotion、format。\n产出：本地音频文件。超过 10000 字请改用 minimax_speak_long。',
+  'settings.cap.speechLong': 'minimax_speak_long 异步长文本语音\n输入：text（必填，最多 100000 字），可选 model、voice_id、speed、vol、pitch、emotion、format、language_boost。\n产出：任务 id（generating）；用 minimax_media_status 取回后保存为本地音频。上游下载链接只有 9 小时有效期。',
+  'settings.cap.transcribe': 'minimax_transcribe 语音转文字\n输入：audio_path（本地音频文件）或 audio_url（音频地址），可选 model、response_format、timestamp_level、language。\n产出：转写文本，不产生媒体文件。',
   'settings.cap.music': 'minimax_generate_music 文本生成音乐\n输入：prompt（必填，最多 60000 字），可选 model。\n产出：本地音频文件。音乐模型官方已退役，只有存量付费账号可用，新账号可能直接失败。',
   'settings.cap.status': 'minimax_media_status\n输入：task_id。\n产出：当前状态。结果已生成时保存本地文件。不重新生成。',
   'settings.cap.retry': 'minimax_media_retry_download\n输入：保存失败的 task_id。\n产出：重新下载后的本地文件。没有可下载结果时会拒绝，不会重新生成。',
@@ -261,8 +263,10 @@ export const en = {
   'settings.cap.image': 'minimax_generate_image, text to image\nInput: prompt (required, up to 60000 characters), optional model and n (1-4, default 1).\nOutput: 1-4 local image paths. If it is not saved, the task status is returned and nothing is generated again.',
   'settings.cap.imageEdit': 'minimax_edit_image, image to image\nInput: prompt, plus 1-5 reference images (image_url, image_urls, or a saved image task). A local file over 8MB must be an HTTPS URL.\nOutput: the edited image, saved locally.',
   'settings.cap.video': 'minimax_generate_video, text to video or image to video\nInput: prompt, optional duration (1-15 seconds, default 2). Image to video also takes one still via image_url or a saved image task.\nOutput: a task id with status generating. Call minimax_media_status to save the MP4.',
-  'settings.cap.speech': 'minimax_speak, text to speech\nInput: input (required, up to 60000 characters), optional model and voice.\nOutput: a local MP3. It does not accept audio input; use minimax_transcribe to turn speech into text.',
-  'settings.cap.transcribe': 'minimax_transcribe, speech to text\nInput: an audio source (an audio URL, or a saved speech task).\nOutput: the transcribed text; it does not produce a media file.',
+  'settings.cap.voices': 'minimax_list_voices, list available voices\nInput: optional voice_type (system / voice_cloning / voice_generation / all, default system).\nOutput: available voice_id values with names and descriptions, ready to pass to minimax_speak and minimax_speak_long; no media file is produced.',
+  'settings.cap.speech': 'minimax_speak, synchronous text to speech\nInput: text (required, up to 10000 characters), optional model, voice_id, speed, vol, pitch, emotion and format.\nOutput: a local audio file. Text longer than 10000 characters goes through minimax_speak_long.',
+  'settings.cap.speechLong': 'minimax_speak_long, asynchronous long-form speech\nInput: text (required, up to 100000 characters), optional model, voice_id, speed, vol, pitch, emotion, format and language_boost.\nOutput: a task id with status generating; fetch it with minimax_media_status to save the local audio file. The upstream download link is valid for 9 hours only.',
+  'settings.cap.transcribe': 'minimax_transcribe, speech to text\nInput: audio_path (a local audio file) or audio_url (an audio address), optional model, response_format, timestamp_level and language.\nOutput: the transcribed text; it does not produce a media file.',
   'settings.cap.music': 'minimax_generate_music, text to music\nInput: prompt (required, up to 60000 characters), optional model.\nOutput: a local audio file. The vendor has retired the music models; only existing paid accounts can still use them, so new accounts may fail.',
   'settings.cap.status': 'minimax_media_status\nInput: task_id.\nOutput: the current status. A finished result is saved locally. Nothing is generated again.',
   'settings.cap.retry': 'minimax_media_retry_download\nInput: the task_id of a failed save.\nOutput: the local file after another download. If there is nothing to download, it refuses instead of generating again.',
@@ -433,7 +437,7 @@ function SavedFiles({ files, openFile }) {
     style: { ...snap.file, cursor: openFile ? 'pointer' : 'default' },
   }, fileName(file.path))));
 }
-const tools = ['minimax_models', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_speak', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
+const tools = ['minimax_models', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_list_voices', 'minimax_speak', 'minimax_speak_long', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
 
 export function resultValue(block) {
   try { return JSON.parse((block?.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n')); }
@@ -507,7 +511,7 @@ const SIZE_UNITS = { '': 1, k: 1000, m: 1000000 };
 // 思考强度是模型覆盖项里可选的档位；MiniMax 没有公开按模型分档的默认值，所以默认全不勾。
 const ALL_EFFORTS = EFFORT_ORDER;
 const CHAT_CAPABILITY_KEYS = ['settings.cap.chat', 'settings.cap.models', 'settings.cap.seeMedia'];
-const MEDIA_CAPABILITY_KEYS = ['settings.cap.image', 'settings.cap.imageEdit', 'settings.cap.video', 'settings.cap.speech', 'settings.cap.transcribe', 'settings.cap.music', 'settings.cap.status', 'settings.cap.retry', 'settings.cap.list', 'settings.cap.watch', 'settings.cap.player', 'settings.cap.unsupported', 'settings.cap.seeChat'];
+const MEDIA_CAPABILITY_KEYS = ['settings.cap.image', 'settings.cap.imageEdit', 'settings.cap.video', 'settings.cap.voices', 'settings.cap.speech', 'settings.cap.speechLong', 'settings.cap.transcribe', 'settings.cap.music', 'settings.cap.status', 'settings.cap.retry', 'settings.cap.list', 'settings.cap.watch', 'settings.cap.player', 'settings.cap.unsupported', 'settings.cap.seeChat'];
 // 媒体模型下拉按类别筛选：优先用上游给的类别，没有类别时按模型 ID 的常见命名判断。
 // 兜底命名覆盖 MiniMax 官方在用的模型名：image-01、speech-2.8-hd、music-3.0、MiniMax-H3 等。
 const MEDIA_FIELDS = [

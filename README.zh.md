@@ -21,15 +21,17 @@
 | 媒体任务持久化 | 媒体任务按会话隔离，重启后仍在。下载先写 `.part` 临时文件再改名。下载失败可以只重试下载，不重新生成，不会重复计费。 |
 | 结果呈现 | 工具结果卡片、文件预览，以及 MP4 / MP3 / WAV 的侧栏播放器。卡片与播放器跟随 dsh 语言。 |
 
-插件注册两个组件：`minimax-byapi`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 10 个工具：
+插件注册两个组件：`minimax-byapi`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 12 个工具：
 
 | 工具 | 作用 |
 | --- | --- |
 | `minimax_models` | 刷新模型清单，按能力分组返回。可选 `verify_key` 用一次 `GET /v1/models` 校验地址与密钥。 |
-| `minimax_generate_image` | 文生图：`prompt`，可选 `model`、宽高比、`n`（1–9，默认 1）。 |
+| `minimax_generate_image` | 文生图：`prompt`，可选 `model`、宽高比、`n`（1–9，默认 1）、`image-01-live` 的画风设置。 |
 | `minimax_edit_image` | 图生图：`prompt` 加一张参考图（`subject_reference`）。 |
 | `minimax_generate_video` | 文生视频。V2 模型（MiniMax-H3 系列）4–15 秒；V1 模型（Hailuo 系列）6 秒或 10 秒。 |
-| `minimax_speak` | 文字转语音：`input`，可选 `model` 与 `voice`。 |
+| `minimax_list_voices` | 查询当前账号可用的 `voice_id`（`system` / `voice_cloning` / `voice_generation` / `all`）。 |
+| `minimax_speak` | 同步文字转语音：`text` 最多 10000 字，可选 `model`、`voice_id`、语速、音量、音高、情绪与格式。 |
+| `minimax_speak_long` | 异步长文本语音：`text` 最多 100000 字，返回任务 id，用 `minimax_media_status` 取回。 |
 | `minimax_transcribe` | 语音转文字：上传音频文件并返回转写文本。 |
 | `minimax_generate_music` | 文本生成音乐。官方已退役 —— 见[音乐能力已退役](#音乐能力已退役)。 |
 | `minimax_media_list` | 列出当前会话创建过的媒体任务。 |
@@ -121,7 +123,7 @@ git 安装的更新方式是先移除再添加新提交；本地目录安装用 
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
 ```
 
-卸载会把插件的各层从 profile 中移除：提供方、10 个工具和设置页都会消失。但**已生成的媒体与任务记录不会被删除，凭据也不会被删除**。要清掉文件请自行删除数据目录：
+卸载会把插件的各层从 profile 中移除：提供方、12 个工具和设置页都会消失。但**已生成的媒体与任务记录不会被删除，凭据也不会被删除**。要清掉文件请自行删除数据目录：
 
 ```powershell
 Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
@@ -235,7 +237,7 @@ MiniMax 已退役音乐模型，并且自 **2026-08-20** 起音乐 API 不再向
 - **对话：** 在模型选择器里选择 **MiniMax**。只有对话模型在列；设置页的模型表就是选择器看到的内容，删一行并保存即可隐藏该模型。
 - **图片：** 一次调用即生成并保存；用绝对本地路径内联展示 —— `![alt](<D:/path/result-1.png>)`。dsh Web 通过 `/api/file` 提供该文件，单文件上限 20 MiB。
 - **视频：** 提交任务后，用返回的 `task_id` 反复调用 `minimax_media_status`，直到结果保存完成或任务失败；状态卡片不会自行刷新。提交状态未知的任务不要重复提交，否则会重复计费。
-- **语音：** `minimax_speak` 写出音频文件；`minimax_transcribe` 上传本地音频并返回转写文本。
+- **语音：** `minimax_speak` 处理 1 万字符以内的文本并写出音频文件；`minimax_speak_long` 提交异步长文本任务并返回任务 id，用 `minimax_media_status` 取回；`minimax_list_voices` 返回可传给两者的 `voice_id`。`minimax_transcribe` 上传本地音频并返回转写文本。
 - **展示：** 视频与音频出现在工具结果卡片播放器里。不要用 Markdown 图片语法内联它们 —— 聊天不会渲染，只会显示裂图。
 
 ## 故障排查

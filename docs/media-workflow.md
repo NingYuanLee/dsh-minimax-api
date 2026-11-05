@@ -9,7 +9,9 @@
 | `minimax_generate_image` | 文生图 | `POST {root}/v1/image_generation` |
 | `minimax_edit_image` | 图生图（参考图） | `POST {root}/v1/image_generation` |
 | `minimax_generate_video` | 文生视频 / 图生视频 | `POST {root}/v2/video_generation`（H3 系）或 `POST {root}/v1/video_generation`（Hailuo 系） |
-| `minimax_speak` | 文字转语音 | `POST {root}/v1/t2a_v2` |
+| `minimax_list_voices` | 查询可用音色 ID | `POST {root}/v1/get_voice` |
+| `minimax_speak` | 同步文字转语音（≤10000 字符） | `POST {root}/v1/t2a_v2` |
+| `minimax_speak_long` | 异步长文本语音（≤100000 字符） | 创建 `POST {root}/v1/t2a_async_v2` → 查询 `GET {root}/v1/query/t2a_async_query_v2?task_id=…` → 文件 `GET {root}/v1/files/retrieve?file_id=…` |
 | `minimax_transcribe` | 语音转文字 | `POST {root}/v1/speech_to_text` |
 | `minimax_generate_music` | 文本生成音乐 | `POST {root}/v1/music_generation`（官方已退役） |
 | `minimax_media_status` | 查询任务状态并取回结果 | 查询 + 下载 |
@@ -54,7 +56,9 @@ v2 的画幅规则：文生视频（只含文本）必须给具体比例，不�
 
 ## 语音与转写
 
-- **文字转语音**：`POST /v1/t2a_v2`，模型 `speech-2.8-hd` / `-turbo`、`speech-2.6-hd` / `-turbo`、`speech-02-hd` / `-turbo`。响应 `data.audio` 是 **hex 编码**的音频，插件会解码成二进制再落盘。`data.status` 为 1 表示合成中、2 表示完成。
+- **音色查询**：`POST /v1/get_voice`，`voice_type` 取 `system` / `voice_cloning` / `voice_generation` / `all`，返回 `system_voice[]`（含 `voice_id`、`voice_name`、`description`）以及复刻、文生两类音色。复刻与文生音色只有在成功用于一次语音合成后才会被列出来。
+- **同步文字转语音**：`POST /v1/t2a_v2`，模型 `speech-2.8-hd` / `-turbo`、`speech-2.6-hd` / `-turbo`、`speech-02-hd` / `-turbo`，单次最多 10000 字符。响应 `data.audio` 是 **hex 编码**的音频，插件会解码成二进制再落盘。`data.status` 为 1 表示合成中、2 表示完成。
+- **异步长文本语音**：先 `POST /v1/t2a_async_v2` 创建任务（单次最多 100000 字符，音频字段用 `audio_sample_rate`、默认双声道），拿到 `task_id` 后用 `GET /v1/query/t2a_async_query_v2?task_id=…` 查询（`Processing` / `Success` / `Failed` / `Expired`，每秒最多查询 10 次），成功后用返回的 `file_id` 走 `GET /v1/files/retrieve?file_id=…` 拿下载地址。**下载地址只有 9 小时有效期**，过期后结果即丢失，所以任务完成后要尽快用 `minimax_media_status` 取回。
 - **语音转文字**：`POST /v1/speech_to_text`，multipart 上传，模型 `asr-1.0`，返回 `text`（`verbose_json` 还会给分段与说话人数）。音频最长约 500 秒、50 MB 以内。
 
 ## 音乐已退役

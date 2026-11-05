@@ -327,3 +327,80 @@ test('视频 prompt 长度：v2 到 7000，v1 到 2000', async t => {
   await assert.rejects(f.manager.video({ model: 'MiniMax-H3', prompt: 'x'.repeat(7001) }, 's'));
   await assert.rejects(f.manager.video({ model: 'MiniMax-Hailuo-02', prompt: 'x'.repeat(2001) }, 's'));
 });
+
+test('音色查询：三种来源合并返回，base_resp 非 0 时抛可读错误', async t => {
+  let calls = 0, body = null, fail = false;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url !== '/v1/get_voice') { res.writeHead(404); res.end('{}'); return; }
+    calls++; body = JSON.parse(await readBody(req));
+    if (fail) { json(res, { base_resp: { status_code: 1004, status_msg: '鉴权失败' } }); return; }
+    json(res, {
+      system_voice: [{ voice_id: 'Chinese (Mandarin)_News_Anchor', voice_name: '新闻女声', description: ['专业播音腔'] }],
+      voice_cloning: [{ voice_id: 'clone-1', description: [], created_time: '2025-08-20' }],
+      voice_generation: [{ voice_id: 'ttv-1', description: [], created_time: '2025-08-21' }],
+      base_resp: { status_code: 0, status_msg: 'success' },
+    });
+  });
+  const all = await f.manager.voices({ voice_type: 'all' }, 'owner-a');
+  assert.equal(calls, 1);
+  assert.equal(body.voice_type, 'all');
+  assert.deepEqual(all.counts, { system: 1, cloning: 1, generation: 1 });
+  assert.deepEqual(all.voices.map(v => v.source).sort(), ['cloning', 'generation', 'system']);
+  assert.ok(all.voices.some(v => v.voice_id === 'Chinese (Mandarin)_News_Anchor' && v.voice_name === '新闻女声'));
+  await f.manager.voices(undefined, 'owner-a');
+  assert.equal(body.voice_type, 'system', '默认只查系统音色');
+  fail = true;
+  await assert.rejects(f.manager.voices({ voice_type: 'system' }, 'owner-a'), /1004|鉴权失败/);
+});
+
+test('异步长文本语音：创建→查询→文件接口→下载保存，只提交一次', async t => {
+  let posts = 0, queries = 0, retrieves = 0, downloads = 0, body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v1/t2a_async_v2') {
+      posts++; body = JSON.parse(await readBody(req));
+      json(res, { task_id: 95157322, file_id: 95157323, usage_characters: 12, base_resp: { status_code: 0, status_msg: 'success' } });
+    } else if (req.url === '/v1/query/t2a_async_query_v2?task_id=95157322') {
+      queries++;
+      if (queries < 2) json(res, { task_id: 95157322, status: 'Processing', base_resp: { status_code: 0 } });
+      else json(res, { task_id: 95157322, status: 'Success', file_id: 95157399, base_resp: { status_code: 0 } });
+    } else if (req.url === '/v1/files/retrieve?file_id=95157399') {
+      retrieves++; json(res, { file: { file_id: 95157399, download_url: `http://${req.headers.host}/audio/out.mp3`, filename: 'out.mp3' }, base_resp: { status_code: 0 } });
+    } else if (req.url === '/audio/out.mp3') {
+      downloads++; assert.equal(req.headers.authorization, undefined);
+      res.writeHead(200, { 'content-type': 'audio/mpeg' }); res.end(mp3);
+    } else { res.writeHead(404); res.end('{}'); }
+  });
+  const created = await f.manager.speakLong({ model: 'speech-2.8-hd', text: 'x'.repeat(20000), voice_id: 'Chinese (Mandarin)_News_Anchor', format: 'mp3' }, 'owner-a');
+  assert.equal(created.status, 'generating');
+  assert.equal(created.remoteId, '95157322');
+  assert.equal(posts, 1, '长文本任务只提交一次');
+  assert.equal(body.model, 'speech-2.8-hd');
+  assert.equal(body.voice_setting.voice_id, 'Chinese (Mandarin)_News_Anchor');
+  assert.equal(body.audio_setting.audio_sample_rate, 32000, '异步接口用 audio_sample_rate');
+  assert.equal(body.audio_setting.sample_rate, undefined, '不能下发同步接口的 sample_rate');
+  assert.equal(body.audio_setting.channel, 2, '异步接口默认双声道');
+
+  const first = await f.manager.poll(created.id, 'owner-a');
+  assert.equal(first.status, 'generating');
+  const second = await f.manager.poll(created.id, 'owner-a');
+  assert.equal(second.status, 'saved');
+  assert.equal(retrieves, 1); assert.equal(downloads, 1); assert.equal(posts, 1, '查询与下载都不会重复提交');
+  assert.equal(second.files[0].mime, 'audio/mpeg');
+  assert.deepEqual(await readFile(second.files[0].path), mp3);
+});
+
+test('异步长文本语音：失败与过期都给出可读原因，且不会重新提交', async t => {
+  let status = 'Failed', posts = 0;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v1/t2a_async_v2') { posts++; json(res, { task_id: 42, base_resp: { status_code: 0 } }); }
+    else if (req.url.startsWith('/v1/query/t2a_async_query_v2')) json(res, { task_id: 42, status, base_resp: { status_code: 0 } });
+    else { res.writeHead(404); res.end('{}'); }
+  });
+  const created = await f.manager.speakLong({ model: 'speech-2.8-hd', text: 'hello' }, 'owner-a');
+  const failed = await f.manager.poll(created.id, 'owner-a');
+  assert.equal(failed.status, 'failed');
+  assert.match(String(failed.error), /失败|过期/);
+  const again = await f.manager.poll(created.id, 'owner-a');
+  assert.equal(again.status, 'failed', '失败任务再查询仍是快照');
+  assert.equal(posts, 1, '失败后不会重新提交');
+});

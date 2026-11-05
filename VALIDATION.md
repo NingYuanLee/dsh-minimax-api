@@ -35,7 +35,7 @@ npm pack --dry-run --ignore-scripts
 - ✅ `npm run check` 通过（2026-11-05）。
 - ✅ `npm pack --dry-run --ignore-scripts` 的产物清单为：`CHANGELOG.md`、`LICENSE`、`README.md`、`README.zh.md`、`SECURITY.md`、`assets/media.svg`、`cordis.patch.yml`、`icon.svg`、`lib/client.js`、`locale/en.json`、`locale/media/en.json`、`locale/media/zh.json`、`locale/zh.json`、`package.json`、`scripts/build-client.mjs`、`src/*.js`。
   - `package.json` 的 `files` 白名单**不含 `docs/` 与 `test/`**：仓库里的 `docs/` 说明文档只在仓库站点可见，不随安装包分发。README 的「延伸阅读」链接指向仓库路径，不表示安装包内含 `docs/` 目录。
-- ✅ `npm test` 全绿（2026-11-05）：79 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页）、`test/package-meta.test.js`（发布清单与 `engines` 基线）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
+- ✅ `npm test` 全绿（2026-11-05）：91 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、12 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
 - ✅ 独立 profile 实机安装（2026-11-05，宿主 dsh `0.2.2-rc.1`）：
   ```powershell
   dsh --profile minimax-test --from-default-profile web --dump-config
@@ -94,6 +94,8 @@ npm pack --dry-run --ignore-scripts
 - 视频：V2 接口 `POST /v2/video_generation`（`MiniMax-H3` 768P/2K、`MiniMax-H3-Highspeed` 480P/768P、`MiniMax-H3-Lite` 480P/768P、`MiniMax-H3-Max` 480P/768P；时长前三者 4–15 秒、`MiniMax-H3-Max` 5–15 秒），查询 `GET /v2/query/video_generation/{task_id}`，成片地址在 `task.content.url`；V1 接口 `POST /v1/video_generation`（`MiniMax-Hailuo-2.3` / `-Fast` / `Hailuo-02`，6 或 10 秒，512P / 720P / 768P / 1080P），查询后取 `file_id` 再 `GET /v1/files/retrieve?file_id=…` 下载。两者都是「创建 → 查询 → 下载」三步异步。
 - 视频 v2 的画幅规则：文生视频（只含 text）必须给具体比例，不能用 `adaptive`；图生视频（带首帧）比例固定为 `adaptive`；`MiniMax-H3-Lite` 暂不支持 `adaptive`。v2 的 `text` 上限 7000 字符（v1 仍为 2000）。
 - 语音合成：`POST /v1/t2a_v2`，模型 `speech-2.8-hd` / `-turbo`、`speech-2.6-hd` / `-turbo`、`speech-02-hd` / `-turbo`；响应 `data.audio` 为 hex 编码音频。
+- 音色查询：`POST /v1/get_voice`，`voice_type` 取 `system` / `voice_cloning` / `voice_generation` / `all`；返回 `system_voice[]`（`voice_id` / `voice_name` / `description`）等分组，复刻与文生音色需先成功用于一次合成才会出现。
+- 异步长文本语音：创建 `POST /v1/t2a_async_v2`（≤100,000 字符，`audio_setting` 用 `audio_sample_rate`、默认双声道）→ 查询 `GET /v1/query/t2a_async_query_v2?task_id=…`（`Processing` / `Success` / `Failed` / `Expired`，每秒最多 10 次）→ 用 `file_id` 走 `GET /v1/files/retrieve?file_id=…` 取下载地址（**9 小时有效**）。
 - 语音转文字：`POST /v1/speech_to_text`（multipart），模型 `asr-1.0`，返回文本。
 - 来源：<https://platform.minimax.cn/docs/api-reference/api-overview>、<https://platform.minimax.cn/docs/api-reference/image-generation-t2i.md>、<https://platform.minimax.cn/docs/api-reference/image-generation-i2i.md>、<https://platform.minimax.cn/docs/api-reference/video-generation-v2-create.md>、<https://platform.minimax.io/docs/api-reference/video-generation-v2-query.md>、<https://platform.minimax.io/docs/api-reference/video-generation-t2v.md>、<https://platform.minimax.io/docs/api-reference/video-generation-download.md>、<https://platform.minimax.io/docs/api-reference/speech-t2a-http.md>、<https://platform.minimax.io/docs/api-reference/speech-to-text.md>
 
@@ -114,6 +116,7 @@ npm pack --dry-run --ignore-scripts
 - ⚠️ **dsh 实机验收的范围**：已在 dsh `0.2.2-rc.1` 的独立 Web profile 完成安装、加载、组件状态与设置页渲染的实机验证；尚未验证模型选择器中实际出现 MiniMax 模型、保存密钥后的凭据回写、以及媒体文件在会话中的播放（这些都需要真实 Key）。
 - ❌ **M Plan 档位差异**：未验证各订阅档位可调用的模型范围（尤其 H3 视频）。
 - ❌ **ASR 实测**：`asr-1.0` 的转写只做了接口与字段层面的文档核对，未跑真实音频。
+- ❌ **音色查询与异步长文本语音实测**：`/v1/get_voice` 与 `t2a_async_v2` 全链路只用本地桩服务验证了请求与状态机，未用真实账号跑过；真实音色列表内容与 9 小时下载窗口未验证。
 - ❌ **音乐实测**：新账号必然失败（上游已对新用户关闭）；存量付费账号能否调用未验证。
 - ❌ **npm 发布与市场收录**：包尚未发布到 npm，安装方式为 git 或本地目录；`awesome-dsh-plugin` 等市场收录未做。
 - ⚠️ **速率限制**：官方给出 LLM 200 RPM / 10M TPM、生图 10 RPM、视频 V1 20 RPM、V2 300 RPM（最多 30 个在飞任务）、TTS 60 RPM 等限制，插件不做本地限流，完全依赖上游。

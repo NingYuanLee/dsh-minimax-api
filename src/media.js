@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { withFileLock } from './lock.js';
 import {
   createImage, createVideoV1, createVideoV2, queryVideoV1, queryVideoV2, retrieveFile,
-  synthesizeSpeech, generateMusic, transcribeAudio, normalizeApiRoot, isVideoV2, MiniMaxError,
+  synthesizeSpeech, generateMusic, transcribeAudio, listVoices, createSpeechAsync, querySpeechAsync,
+  normalizeApiRoot, isVideoV2, MiniMaxError,
   ASR_MAX_BYTES, IMAGE_ASPECT_RATIOS, IMAGE_STYLE_TYPES, PROMPT_EXPANSION_MODES,
 } from './minimax-api.js';
 
@@ -23,6 +24,8 @@ const IMAGE_PROMPT_MAX = 1500;
 const VIDEO_PROMPT_MAX = 2000;
 const VIDEO_PROMPT_MAX_V2 = 7000;
 const SPEECH_TEXT_MAX = 10000;
+// 异步长文本语音接口单次上限 100,000 字符（同步接口是 10,000）。
+const SPEECH_ASYNC_TEXT_MAX = 100000;
 const MUSIC_PROMPT_MAX = 2000;
 const MUSIC_LYRICS_MAX = 3500;
 const IMAGE_COUNT_MAX = 9;
@@ -414,6 +417,41 @@ export class MediaManager {
       return { sources: [{ raw: result.audioBytes.toString('base64'), mime: result.mime }] };
     });
   }
+  // 异步长文本语音：创建任务后立刻返回 task_id，后续由 poll 查询并用 file_id 下载。
+  async speakLong(args, owner, signal) {
+    const text = requireText(args.text, '朗读文本', SPEECH_ASYNC_TEXT_MAX);
+    return this.create('speech', args, owner, signal, async (client, a) => {
+      const voice = {};
+      if (a.voice_id) voice.voice_id = a.voice_id;
+      if (a.speed !== undefined) voice.speed = a.speed;
+      if (a.vol !== undefined) voice.vol = a.vol;
+      if (a.pitch !== undefined) voice.pitch = a.pitch;
+      if (a.emotion) voice.emotion = a.emotion;
+      const format = a.format || 'mp3';
+      // 异步接口的音频字段是 audio_sample_rate（同步接口是 sample_rate），channel 默认 2。
+      const audio_setting = {
+        audio_sample_rate: a.sample_rate ?? 32000,
+        bitrate: a.bitrate ?? 128000,
+        format,
+        channel: a.channel ?? 2,
+      };
+      const result = await createSpeechAsync({ ...client, model: a.model, text, voice_setting: voice, audio_setting, language_boost: a.language_boost });
+      return { taskId: result.taskId };
+    });
+  }
+  // 查询可用音色：不落媒体文件、不建任务。签名与其他方法一致（args, owner, signal），owner 不使用。
+  async voices(args, _owner, signal) {
+    const active = this.signal(signal);
+    const apiKey = await this.resolveKey();
+    const voiceType = typeof args?.voice_type === 'string' && args.voice_type.trim() ? args.voice_type.trim() : 'system';
+    const voices = await listVoices({ ...this.client(apiKey, active), voiceType });
+    const rows = [
+      ...voices.system.map(row => ({ ...row, source: 'system' })),
+      ...voices.cloning.map(row => ({ ...row, source: 'cloning' })),
+      ...voices.generation.map(row => ({ ...row, source: 'generation' })),
+    ];
+    return { voice_type: voiceType, counts: { system: voices.system.length, cloning: voices.cloning.length, generation: voices.generation.length }, voices: rows };
+  }
   async music(args, owner, signal) {
     const prompt = requireText(args.prompt, '音乐描述', MUSIC_PROMPT_MAX);
     if (typeof args.lyrics === 'string' && args.lyrics.length > MUSIC_LYRICS_MAX) throw new Error('歌词不能超过 ' + MUSIC_LYRICS_MAX + ' 个字符');
@@ -460,13 +498,26 @@ export class MediaManager {
   }
   async poll(id, owner, signal) {
     const task = this.lookup(id, owner);
-    if (task.kind !== 'video' || !task.remoteId || ['saved', 'failed'].includes(task.status)) return this.public(task);
+    if (!task.remoteId || ['saved', 'failed'].includes(task.status)) return this.public(task);
     return this.locked(id, async () => {
       const active = this.signal(signal);
       try {
         const apiKey = await this.resolveKey();
         const client = this.client(apiKey, active);
-        if (task.apiVersion === 2) {
+        if (task.kind === 'speech') {
+          // 异步长文本语音：查询任务 → Success 后取 file_id → 文件接口换下载地址。
+          const state = await querySpeechAsync({ ...client, taskId: task.remoteId });
+          if (state.status === 'success') {
+            const fileId = state.fileId || task.fileId;
+            if (!fileId) throw new MiniMaxError('MiniMax 异步语音任务没有返回文件 ID');
+            task.fileId = fileId;
+            const file = await retrieveFile({ ...client, fileId });
+            task.sources = [{ url: file.downloadUrl }];
+            return await this.saveResults(task, active);
+          }
+          if (state.status === 'failed') { task.status = 'failed'; task.error = state.error || '上游异步语音任务失败或已过期'; }
+          else { task.status = 'generating'; delete task.error; }
+        } else if (task.apiVersion === 2) {
           const state = await queryVideoV2({ ...client, taskId: task.remoteId });
           if (state.status === 'success') {
             if (!state.downloadUrl) throw new MiniMaxError('MiniMax 视频任务没有返回成片地址');
@@ -496,7 +547,7 @@ export class MediaManager {
   async retryDownload(id, owner, signal) {
     const task = this.lookup(id, owner);
     if (task.status === 'saved') return this.public(task);
-    if (task.kind === 'video' && task.remoteId && !task.sources.length) return this.poll(id, owner, signal);
+    if (['video', 'speech'].includes(task.kind) && task.remoteId && !task.sources.length) return this.poll(id, owner, signal);
     if (!task.sources.length) throw new Error('该任务没有可恢复的下载结果，不能以重试下载方式重新生成');
     return this.locked(id, () => this.saveResults(task, this.signal(signal)));
   }
@@ -510,7 +561,8 @@ export class MediaManager {
   ensureWatch(id) {
     const task = this.tasks.get(id);
     if (!this.onUpdate || !task || this.watchers.has(id)) return;
-    if (task.kind !== 'video' || !task.remoteId || task.status !== 'generating') return;
+    // 视频与异步长文本语音都是远端任务，需要在后台轮询。
+    if (!['video', 'speech'].includes(task.kind) || !task.remoteId || task.status !== 'generating') return;
     this.watchers.add(id);
     void this.follow(id, task.owner);
   }

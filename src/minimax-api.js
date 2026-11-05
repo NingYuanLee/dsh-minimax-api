@@ -286,6 +286,53 @@ export async function generateMusic({ apiRoot, apiKey, fetchImpl, signal, model,
   return { audioBytes: bytes, mime: audioMime(format), format, duration: payload?.extra_info?.music_duration };
 }
 
+// 查询当前账号可用的音色：系统音色、快速复刻音色与文生音色。
+// 端点 POST /v1/get_voice，voice_type ∈ system | voice_cloning | voice_generation | all。
+export async function listVoices({ apiRoot, apiKey, fetchImpl, signal, voiceType = 'system' }) {
+  const allowed = ['system', 'voice_cloning', 'voice_generation', 'all'];
+  if (!allowed.includes(voiceType)) throw new MiniMaxError('音色类型必须为 ' + allowed.join(' / '));
+  const payload = await requestJson({ apiRoot, apiKey, fetchImpl, signal, method: 'POST', path: '/v1/get_voice', body: { voice_type: voiceType } });
+  const normalize = row => ({
+    voice_id: typeof row?.voice_id === 'string' ? row.voice_id : '',
+    voice_name: typeof row?.voice_name === 'string' ? row.voice_name : '',
+    description: toStringList(row?.description),
+    created_time: typeof row?.created_time === 'string' ? row.created_time : undefined,
+  });
+  return {
+    system: (Array.isArray(payload?.system_voice) ? payload.system_voice : []).map(normalize).filter(row => row.voice_id),
+    cloning: (Array.isArray(payload?.voice_cloning) ? payload.voice_cloning : []).map(normalize).filter(row => row.voice_id),
+    generation: (Array.isArray(payload?.voice_generation) ? payload.voice_generation : []).map(normalize).filter(row => row.voice_id),
+  };
+}
+
+// 异步长文本语音合成：创建任务后返回 task_id，查询成功后用 file_id 走文件接口下载。
+// 音频设置在这里用 audio_sample_rate（同步接口用的是 sample_rate）。
+export async function createSpeechAsync({ apiRoot, apiKey, fetchImpl, signal, model, text, voice_setting, audio_setting, language_boost }) {
+  const body = { model, text };
+  if (voice_setting && Object.keys(voice_setting).length) body.voice_setting = voice_setting;
+  if (audio_setting && Object.keys(audio_setting).length) body.audio_setting = audio_setting;
+  if (language_boost) body.language_boost = language_boost;
+  const payload = await requestJson({ apiRoot, apiKey, fetchImpl, signal, method: 'POST', path: '/v1/t2a_async_v2', body });
+  const taskId = payload?.task_id;
+  if (taskId === undefined || taskId === null || String(taskId) === '') throw new MiniMaxError('MiniMax 异步语音接口没有返回任务 ID');
+  return {
+    taskId: String(taskId),
+    fileId: payload?.file_id !== undefined && payload?.file_id !== null ? String(payload.file_id) : undefined,
+    usageCharacters: Number.isFinite(payload?.usage_characters) ? payload.usage_characters : undefined,
+  };
+}
+
+export async function querySpeechAsync({ apiRoot, apiKey, fetchImpl, signal, taskId }) {
+  const payload = await requestJson({ apiRoot, apiKey, fetchImpl, signal, method: 'GET', path: '/v1/query/t2a_async_query_v2', query: { task_id: taskId } });
+  const status = String(payload?.status || '').trim().toLowerCase();
+  return {
+    status: status === 'success' ? 'success' : status === 'failed' || status === 'expired' ? 'failed' : 'processing',
+    taskId: payload?.task_id !== undefined && payload?.task_id !== null ? String(payload.task_id) : String(taskId),
+    fileId: payload?.file_id !== undefined && payload?.file_id !== null ? String(payload.file_id) : undefined,
+    error: status === 'expired' ? '异步语音任务已过期（下载链接只有 9 小时有效期）' : undefined,
+  };
+}
+
 // 语音转文字：multipart/form-data，响应文本或 JSON。
 export async function transcribeAudio({ apiRoot, apiKey, fetchImpl = fetch, signal, model = 'asr-1.0', bytes, filename = 'audio', response_format = 'json', timestamp_level, language }) {
   if (!bytes?.length) throw new MiniMaxError('转写音频为空');

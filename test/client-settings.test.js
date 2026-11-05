@@ -52,7 +52,7 @@ const textsOf = node => [].concat(node?.children ?? []).map(c => (typeof c === '
 const byLabel = (tree, label) => walk(tree).find(n => (n.props || {})['aria-label'] === label);
 const buttonByText = (tree, label) => walk(tree).find(n => n.type === 'button' && textsOf(n).includes(label));
 const statusText = tree => walk(tree).filter(n => n.props?.role === 'status').map(textsOf).join(' ');
-const TOOL_KEYS = ['minimax_models', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_speak', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
+const TOOL_KEYS = ['minimax_models', 'minimax_generate_image', 'minimax_edit_image', 'minimax_generate_video', 'minimax_list_voices', 'minimax_speak', 'minimax_speak_long', 'minimax_generate_music', 'minimax_transcribe', 'minimax_media_status', 'minimax_media_retry_download', 'minimax_media_list'];
 const BASE_URL = 'https://api.minimax.io/v1';
 
 const DISCOVERED = [

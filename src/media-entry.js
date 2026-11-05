@@ -110,21 +110,44 @@ export async function apply(ctx) {
     source_task_id: { type: 'string', description: '可选。已保存图片任务的 id，用来做图生视频；超过 8MB 请改用 HTTPS 地址' } },
   async (args, exec) => (await runtime.manager()).video({ ...args, model: modelOf(args, 'video', config().videoModel, '视频') }, ownerOf(exec), signalOf(exec)));
 
+  tool('minimax_list_voices', '查询当前账号可用的音色 ID，不产生媒体文件、不建任务。用户要换音色、问“有哪些声音/音色”、或不知道该给 minimax_speak 传什么 voice_id 时用这个工具。'
+    + '参数：voice_type（可选）= system（系统音色，默认）/ voice_cloning（快速复刻音色）/ voice_generation（文生音色）/ all（全部）。'
+    + '返回 voices[].voice_id 就是可以传给 minimax_speak 与 minimax_speak_long 的 voice_id，voice_name 与 description 是便于挑选的中文说明，source 标明来源（system / cloning / generation）。'
+    + '注意：复刻与文生音色只有在成功用于一次语音合成之后才会出现在这里。',
+  { voice_type: { type: 'string', description: '音色类型：system / voice_cloning / voice_generation / all，默认 system' } },
+  async (args, exec) => (await runtime.manager()).voices(args, ownerOf(exec), signalOf(exec)));
+
   tool('minimax_speak', () => '用 MiniMax 语音模型把文字合成语音并保存为音频文件。任何聊天模型都可以调用。用户说“念一下/读出来/配音/转成语音”时用这个工具。'
     + '参数：text（必填）= 要朗读的文本，最长 10000 字符；model（可选）当前可选：' + runtime.describeModels('speech') + '；'
     + 'voice_id（可选）= 音色 ID；speed（可选）= 语速，0.5–2，默认 1；vol（可选）= 音量，0–10，默认 1；pitch（可选）= 音高，-12–12，默认 0；'
     + 'emotion（可选）= 情绪 happy / sad / angry / fearful / disgusted / surprised / calm / fluent / whisper；format（可选）= 输出格式 mp3 / wav / flac / pcm，默认 mp3。'
-    + '一次调用同步完成合成与保存，files[].path 是本地音频路径。本工具不做语音转文字，转写请用 minimax_transcribe。'
+    + '一次调用同步完成合成与保存，files[].path 是本地音频路径。本工具不做语音转文字，转写请用 minimax_transcribe；超过 10000 字符的长文本请改用 minimax_speak_long。'
     + '音频不要用 Markdown 图片语法内联，由结果卡片播放器呈现。',
   { text: { type: 'string', required: true, description: '要朗读的文本，最长 10000 字符' },
     model: { type: 'string', description: '语音模型 ID，来自清单的 speech 类；省略用插件默认' },
-    voice_id: { type: 'string', description: '音色 ID；省略用服务端默认' },
+    voice_id: { type: 'string', description: '音色 ID；省略用服务端默认，可用 minimax_list_voices 查询' },
     speed: { type: 'number', description: '语速，0.5–2，默认 1' },
     vol: { type: 'number', description: '音量，0–10，默认 1' },
     pitch: { type: 'number', description: '音高，-12–12，默认 0' },
     emotion: { type: 'string', description: '情绪：happy / sad / angry / fearful / disgusted / surprised / calm / fluent / whisper' },
     format: { type: 'string', description: '输出格式：mp3 / wav / flac / pcm，默认 mp3' } },
   async (args, exec) => (await runtime.manager()).speech({ ...args, model: modelOf(args, 'speech', config().speechModel, '语音') }, ownerOf(exec), signalOf(exec)));
+
+  tool('minimax_speak_long', () => '用 MiniMax 异步长文本语音合成把长文本转成音频文件。整本书、整篇长文这类超过 1 万字符的内容用这个工具；短文本用 minimax_speak。任何聊天模型都可以调用。'
+    + '参数：text（必填）= 要朗读的文本，最长 100000 字符；model（可选）当前可选：' + runtime.describeModels('speech') + '；voice_id（可选）= 音色 ID，可用 minimax_list_voices 查询；'
+    + 'speed（可选）= 语速 0.5–2；vol（可选）= 音量 0–10；pitch（可选）= 音高 -12–12；emotion（可选）= 情绪；format（可选）= mp3 / wav / flac / pcm，默认 mp3；language_boost（可选）= 语言提示如 Chinese、English。'
+    + '接口是异步的：提交后返回任务 id 与 generating 状态，结果卡片是快照。用 minimax_media_status(task_id) 取回，直到 saved 或 failed；下载链接只有 9 小时有效期，任务完成后尽快取回。'
+    + 'status=submission-unknown 时不要重新提交，那会重复计费。',
+  { text: { type: 'string', required: true, description: '要朗读的文本，最长 100000 字符' },
+    model: { type: 'string', description: '语音模型 ID，来自清单的 speech 类；省略用插件默认' },
+    voice_id: { type: 'string', description: '音色 ID；省略用服务端默认，可用 minimax_list_voices 查询' },
+    speed: { type: 'number', description: '语速，0.5–2，默认 1' },
+    vol: { type: 'number', description: '音量，0–10，默认 1' },
+    pitch: { type: 'number', description: '音高，-12–12，默认 0' },
+    emotion: { type: 'string', description: '情绪：happy / sad / angry / fearful / disgusted / surprised / calm / fluent / whisper' },
+    format: { type: 'string', description: '输出格式：mp3 / wav / flac / pcm，默认 mp3' },
+    language_boost: { type: 'string', description: '语言提示，例如 Chinese、English、auto' } },
+  async (args, exec) => (await runtime.manager()).speakLong({ ...args, model: modelOf(args, 'speech', config().speechModel, '语音') }, ownerOf(exec), signalOf(exec)));
 
   tool('minimax_generate_music', () => '用 MiniMax 音乐模型按描述与歌词生成一首歌并保存为音频文件。'
     + '注意：音乐模型（music-3.0 / music-2.6 / music-cover）已全部退役，2026-08-20 起音乐 API 不再向新用户开放，只有存量付费账号还能调用，新账号调用会失败。'
