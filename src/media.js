@@ -5,7 +5,7 @@ import { withFileLock } from './lock.js';
 import {
   createImage, createVideoV1, createVideoV2, queryVideoV1, queryVideoV2, retrieveFile,
   synthesizeSpeech, generateMusic, transcribeAudio, normalizeApiRoot, isVideoV2, MiniMaxError,
-  ASR_MAX_BYTES,
+  ASR_MAX_BYTES, IMAGE_ASPECT_RATIOS, IMAGE_STYLE_TYPES, PROMPT_EXPANSION_MODES,
 } from './minimax-api.js';
 
 const ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -21,11 +21,16 @@ const INLINE_LIMIT = 8 * 1024 * 1024;
 // 官方文档给出的各接口输入上限。
 const IMAGE_PROMPT_MAX = 1500;
 const VIDEO_PROMPT_MAX = 2000;
+const VIDEO_PROMPT_MAX_V2 = 7000;
 const SPEECH_TEXT_MAX = 10000;
 const MUSIC_PROMPT_MAX = 2000;
 const MUSIC_LYRICS_MAX = 3500;
 const IMAGE_COUNT_MAX = 9;
 const REFERENCE_MAX = 5;
+// 参考图与首帧图的大小上限（官方文档：参考图 <10MB，v1 首帧 <20MB，v2 首帧 ≤30MB）。
+const SUBJECT_MAX_BYTES = 10 * 1024 * 1024;
+const FIRST_FRAME_MAX_BYTES_V1 = 20 * 1024 * 1024;
+const FIRST_FRAME_MAX_BYTES_V2 = 30 * 1024 * 1024;
 
 function sniff(bytes) {
   if (bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return 'image/png';
@@ -37,6 +42,8 @@ function sniff(bytes) {
   if (bytes.subarray(0,4).toString() === 'fLaC') return 'audio/flac';
 }
 const family = mime => String(mime || '').split('/')[0];
+// data URL 的近似字节数：base64 每 4 个字符还原 3 个字节。
+const dataUrlBytes = url => Math.floor((url.slice(url.indexOf(',') + 1).length * 3) / 4);
 
 async function bounded(response, limit, signal) {
   if (Number(response.headers.get('content-length')) > limit) { await response.body?.cancel(); throw new Error('响应超过大小限制'); }
@@ -157,6 +164,7 @@ export class MediaManager {
     return 'data:' + file.mime + ';base64,' + bytes.toString('base64');
   }
   // 图生图 / 图生视频的参考图：公网地址、data URL 或已保存图片任务。
+  // 官方限制：参考图为人像主体，JPG/JPEG/PNG 且小于 10MB。
   async imageReferences(args, owner) {
     const urls = [];
     const push = value => {
@@ -164,6 +172,7 @@ export class MediaManager {
       const url = value.trim();
       if (url.startsWith('data:image/')) {
         if (url.length > INLINE_LIMIT * 2) throw new Error('参考图过大');
+        if (dataUrlBytes(url) > SUBJECT_MAX_BYTES) throw new Error('参考图不能超过 10MB');
         urls.push(url); return;
       }
       this.validateURL(url); urls.push(url);
@@ -171,7 +180,7 @@ export class MediaManager {
     if (typeof args.image_url === 'string') push(args.image_url);
     if (Array.isArray(args.image_urls)) { if (args.image_urls.length > REFERENCE_MAX) throw new Error('图片编辑最多 ' + REFERENCE_MAX + ' 张参考图'); for (const item of args.image_urls) push(item); }
     if (typeof args.source_task_id === 'string' && args.source_task_id) urls.push(await this.inlineFile(this.lookup(args.source_task_id, owner), 'image/'));
-    if (urls.length < 1 || urls.length > REFERENCE_MAX) throw new Error('图片编辑需要 1 到 ' + REFERENCE_MAX + ' 张参考图（image_url、image_urls 或已保存图片任务）');
+    if (urls.length < 1 || urls.length > REFERENCE_MAX) throw new Error('图片编辑需要 1 到 ' + REFERENCE_MAX + ' 张参考图（image_url、image_urls 或已保存图片任务）；参考图为人像主体参考，JPG/JPEG/PNG 且小于 10MB');
     return urls;
   }
   // 图生视频的首帧：只接受一张。
@@ -181,6 +190,10 @@ export class MediaManager {
     if (!hasUrl && !hasTask) return undefined;
     const references = await this.imageReferences({ image_url: args.image_url, source_task_id: args.source_task_id }, owner);
     if (references.length !== 1) throw new Error('图生视频只能带一张静帧');
+    const limit = isVideoV2(args.model) ? FIRST_FRAME_MAX_BYTES_V2 : FIRST_FRAME_MAX_BYTES_V1;
+    if (references[0].startsWith('data:image/') && dataUrlBytes(references[0]) > limit) {
+      throw new Error('首帧图片不能超过 ' + Math.round(limit / 1024 / 1024) + 'MB');
+    }
     return references[0];
   }
   async saveResults(task, signal) {
@@ -251,23 +264,55 @@ export class MediaManager {
       }
     });
   }
-  imageOptions(args) {
-    const options = { model: args.model, response_format: 'url' };
-    if (args.aspect_ratio) options.aspect_ratio = args.aspect_ratio;
-    if (Number.isInteger(args.width)) options.width = args.width;
-    if (Number.isInteger(args.height)) options.height = args.height;
+  // 生图参数校验：不同模型可用的字段不同，非法组合直接报错，不发请求。
+  imageArgs(args) {
+    const model = args.model;
+    const options = { model, response_format: 'url' };
+    const styleType = args.style_type;
+    const styleWeight = args.style_weight;
+    if (styleType !== undefined || styleWeight !== undefined) {
+      if (model !== 'image-01-live') throw new Error('画风设置仅 image-01-live 支持');
+      if (typeof styleType !== 'string' || !IMAGE_STYLE_TYPES.includes(styleType)) {
+        throw new Error('画风类型必须为：' + IMAGE_STYLE_TYPES.join(' / '));
+      }
+      if (styleWeight !== undefined && (typeof styleWeight !== 'number' || !Number.isFinite(styleWeight) || styleWeight <= 0 || styleWeight > 1)) {
+        throw new Error('画风权重必须是 (0, 1] 之间的数字');
+      }
+      options.style = { style_type: styleType };
+      if (styleWeight !== undefined) options.style.style_weight = styleWeight;
+    }
+    if (args.aspect_ratio) {
+      if (!IMAGE_ASPECT_RATIOS.includes(args.aspect_ratio)) throw new Error('宽高比必须为：' + IMAGE_ASPECT_RATIOS.join(' / '));
+      if (args.aspect_ratio === '21:9' && model !== 'image-01') throw new Error('21:9 宽高比仅 image-01 支持');
+      options.aspect_ratio = args.aspect_ratio;
+    }
+    const hasWidth = args.width !== undefined && args.width !== null;
+    const hasHeight = args.height !== undefined && args.height !== null;
+    if (hasWidth !== hasHeight) throw new Error('width 与 height 必须成对设置');
+    if (hasWidth) {
+      if (model !== 'image-01') throw new Error('width 与 height 仅 image-01 支持');
+      for (const value of [args.width, args.height]) {
+        if (!Number.isInteger(value) || value < 512 || value > 2048 || value % 8 !== 0) {
+          throw new Error('width 与 height 必须是 512–2048 之间且为 8 的倍数');
+        }
+      }
+      options.width = args.width; options.height = args.height;
+      // 官方文档说两者同时给出时以 aspect_ratio 为准，这里反过来：给了宽高就不下发 aspect_ratio。
+      delete options.aspect_ratio;
+    }
     if (args.n !== undefined) options.n = args.n;
     if (Number.isInteger(args.seed)) options.seed = args.seed;
     if (typeof args.prompt_optimizer === 'boolean') options.prompt_optimizer = args.prompt_optimizer;
+    if (typeof args.aigc_watermark === 'boolean') options.aigc_watermark = args.aigc_watermark;
     return options;
   }
-  // 参数校验放在建任务之前：非法参数直接报错，不留下失败任务记录。
   async image(args, owner, signal) {
     const prompt = requireText(args.prompt, '图片描述', IMAGE_PROMPT_MAX);
     const n = args.n ?? 1;
     if (!Number.isInteger(n) || n < 1 || n > IMAGE_COUNT_MAX) throw new Error('图片数量必须为 1 到 ' + IMAGE_COUNT_MAX);
-    return this.create('image', args, owner, signal, async (client, a) => {
-      const result = await createImage({ ...client, ...this.imageOptions({ ...a, n }), prompt });
+    const options = this.imageArgs(args);
+    return this.create('image', args, owner, signal, async (client) => {
+      const result = await createImage({ ...client, ...options, prompt });
       return { sources: result.images.map(image => image.url ? { url: image.url } : { b64: image.base64 }) };
     });
   }
@@ -275,10 +320,11 @@ export class MediaManager {
     const prompt = requireText(args.prompt, '图片描述', IMAGE_PROMPT_MAX);
     const n = args.n ?? 1;
     if (!Number.isInteger(n) || n < 1 || n > IMAGE_COUNT_MAX) throw new Error('图片数量必须为 1 到 ' + IMAGE_COUNT_MAX);
+    const options = this.imageArgs(args);
     const references = await this.imageReferences(args, owner);
-    return this.create('image', args, owner, signal, async (client, a) => {
+    return this.create('image', args, owner, signal, async (client) => {
       const result = await createImage({
-        ...client, ...this.imageOptions({ ...a, n }), prompt,
+        ...client, ...options, prompt,
         subject_reference: references.map(url => ({ type: 'character', image_file: url })),
       });
       return { sources: result.images.map(image => image.url ? { url: image.url } : { b64: image.base64 }) };
@@ -286,36 +332,55 @@ export class MediaManager {
   }
   // 视频参数按接口版本分两套：H3 系走 v2，Hailuo 系走 v1。
   videoArgs(args) {
-    const prompt = requireText(args.prompt, '视频描述', VIDEO_PROMPT_MAX);
-    if (isVideoV2(args.model)) {
+    const model = args.model;
+    if (isVideoV2(model)) {
+      const prompt = requireText(args.prompt, '视频描述', VIDEO_PROMPT_MAX_V2);
       const duration = args.duration ?? 5;
-      if (!Number.isInteger(duration) || duration < 4 || duration > 15) throw new Error('H3 视频时长必须为 4 到 15 秒');
-      if (args.model === 'MiniMax-H3-Max' && duration < 5) throw new Error('MiniMax-H3-Max 视频时长不能小于 5 秒');
+      if (!Number.isInteger(duration) || duration < 4 || duration > 15) throw new Error(model + ' 视频时长必须为 4 到 15 秒');
+      if (model === 'MiniMax-H3-Max' && duration < 5) throw new Error('MiniMax-H3-Max 视频时长必须为 5 到 15 秒');
       const resolution = args.resolution || '768P';
-      if (!['480P', '768P', '2K'].includes(resolution)) throw new Error('H3 视频分辨率必须为 480P、768P 或 2K');
-      if (args.model === 'MiniMax-H3' && resolution === '480P') throw new Error('MiniMax-H3 不支持 480P');
-      if (args.model !== 'MiniMax-H3' && resolution === '2K') throw new Error(args.model + ' 不支持 2K');
+      if (!['480P', '768P', '2K'].includes(resolution)) throw new Error(model + ' 视频分辨率必须为 480P、768P 或 2K');
+      if (model === 'MiniMax-H3' && resolution === '480P') throw new Error('MiniMax-H3 视频分辨率只支持 768P 或 2K');
+      if (model !== 'MiniMax-H3' && resolution === '2K') throw new Error(model + ' 视频分辨率不支持 2K');
       const ratio = args.ratio || '16:9';
-      if (!['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'].includes(ratio)) throw new Error('视频画幅取值不合法');
-      return { prompt, duration, resolution, ratio };
+      if (!['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'].includes(ratio)) {
+        throw new Error('视频画幅必须为：adaptive / 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16');
+      }
+      const options = { prompt, duration, resolution, ratio };
+      if (args.prompt_expansion_mode !== undefined) {
+        if (model !== 'MiniMax-H3-Max') throw new Error('该模型不支持 extra 生成选项');
+        if (!PROMPT_EXPANSION_MODES.includes(args.prompt_expansion_mode)) {
+          throw new Error('提示词扩展模式必须为：' + PROMPT_EXPANSION_MODES.join(' / '));
+        }
+        options.extra = { prompt_expansion_mode: args.prompt_expansion_mode };
+      }
+      if (typeof args.aigc_watermark === 'boolean') options.aigc_watermark = args.aigc_watermark;
+      return options;
     }
+    const prompt = requireText(args.prompt, '视频描述', VIDEO_PROMPT_MAX);
     const duration = args.duration ?? 6;
     if (![6, 10].includes(duration)) throw new Error('Hailuo 视频时长必须为 6 或 10 秒');
     if (args.resolution && !['720P', '768P', '1080P'].includes(args.resolution)) throw new Error('视频分辨率必须为 720P、768P 或 1080P');
     if (args.resolution === '1080P' && duration !== 6) throw new Error('1080P 只支持 6 秒');
-    return { prompt, duration, resolution: args.resolution };
+    const options = { prompt, duration, resolution: args.resolution };
+    if (typeof args.aigc_watermark === 'boolean') options.aigc_watermark = args.aigc_watermark;
+    return options;
   }
   async video(args, owner, signal) {
     const options = this.videoArgs(args);
     const frame = await this.firstFrame(args, owner);
+    // 文生视频必须给具体画幅；图生视频的比例由首帧决定，恒为 adaptive。
+    const ratio = frame ? 'adaptive' : options.ratio;
+    if (!frame && ratio === 'adaptive') throw new Error('文生视频必须指定具体画幅，不能使用 adaptive');
     return this.create('video', args, owner, signal, async (client, a, task) => {
       if (isVideoV2(a.model)) {
         // v2 用多模态 content 数组，resolution 与 duration 必填。
         const content = [{ type: 'text', text: options.prompt }];
         if (frame) content.push({ type: 'image_url', image_url: { url: frame }, role: 'first_frame' });
-        // 文生视频必须给具体画幅，图生视频由首帧决定比例。
-        const ratio = frame ? 'adaptive' : options.ratio;
-        const result = await createVideoV2({ ...client, model: a.model, content, resolution: options.resolution, duration: options.duration, ratio });
+        const request = { model: a.model, content, resolution: options.resolution, duration: options.duration, ratio };
+        if (options.extra) request.extra = options.extra;
+        if (typeof options.aigc_watermark === 'boolean') request.aigc_watermark = options.aigc_watermark;
+        const result = await createVideoV2({ ...client, ...request });
         task.apiVersion = 2;
         return { taskId: result.taskId, apiVersion: 2 };
       }

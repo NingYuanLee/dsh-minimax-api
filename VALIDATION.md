@@ -77,15 +77,24 @@ npm pack --dry-run --ignore-scripts
 - `MiniMax-M3.1-Flash` 思考常开，档位 `low` / `medium` / `high` / `xhigh` / `max`；`MiniMax-M3` 为自适应思考，不接受档位参数。
 - 已退役：`MiniMax-M2`、`M2.1`、`M2.5`、`M2.7`、`M2.7-highspeed`、`M1`、`Text-01`、`VL-01`、`abab6.5`；M Plan 用户自动路由到 `MiniMax-M3.1-Flash`。
 - Chat Completions 用 `max_completion_tokens`（`max_tokens` 已废弃），思考内容在 `choices[0].message.reasoning_content`；`temperature` / `top_p` 被接受但无效。
+
+### 对话参数（文本模型）
+
+- Chat Completions：`max_completion_tokens`（推荐 131072、上限 524288）、`reasoning_effort` ∈ low/medium/high/xhigh/max（仅 `MiniMax-M3.1-Flash` 真正生效，省略时为 `max`），`thinking` ∈ `adaptive` / `disabled`（`MiniMax-M3.1-Flash` 强制开启，传 `disabled` 返回 HTTP 400；`MiniMax-M3` 传 `disabled` 跳过思考），`reasoning_split` 默认拆分到 `reasoning_content`，`service_tier` ∈ standard/priority（`MiniMax-M3.1-Flash` 不支持），`temperature` / `top_p` 固定 1 / 0.95、传入无效。
+- Anthropic 兼容：`max_tokens`、`thinking:{type:'adaptive'|'disabled'}`（**只接受这两种 type，没有 `budget_tokens`**）、`output_config:{effort}` ∈ low/medium/high/xhigh/max（仅 `MiniMax-M3.1-Flash`）；`MiniMax-M3` 省略 `thinking` 时默认不思考；`cache_control` 不被这两款模型支持。
+- 响应侧：Chat Completions 的思考在 `reasoning_content`；Anthropic 兼容的思考是 `thinking` 内容块（带 `signature`，多轮需原样回带），流式为 `thinking_delta` / `signature_delta`。
+- 插件侧的实测证据：`test/adapter.test.js` 用本地桩服务断言了请求体 —— Chat Completions 只发 `reasoning_effort` 与 `max_completion_tokens`（不发 `max_tokens`、不发 `thinking`），Anthropic 通道只发 `thinking:{type:'adaptive'}` 与 `output_config.effort`（不发 `budget_tokens`）。
+- 来源：<https://platform.minimax.cn/docs/api-reference/text-chat-openai.md>、<https://platform.minimax.cn/docs/api-reference/text-chat-anthropic.md>
 - 来源：<https://platform.minimax.io/docs/faq/models.md>、<https://platform.minimax.io/docs/api-reference/text-chat-openai.md>、<https://platform.minimax.io/docs/api-reference/api-overview.md>
 
 ### 媒体能力
 
-- 生图：`POST /v1/image_generation`，模型 `image-01` / `image-01-live`；宽高比 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`；`prompt` ≤ 1500 字符；`n` 1–9；图生图通过 `subject_reference` 传参考图。
-- 视频：V2 接口 `POST /v2/video_generation`（`MiniMax-H3`、`MiniMax-H3-Max`，4–15 秒，`MiniMax-H3-Max` 为 5–15 秒），查询 `GET /v2/query/video_generation/{task_id}`，成片地址在 `task.content.url`；V1 接口 `POST /v1/video_generation`（`MiniMax-Hailuo-2.3` / `-Fast` / `Hailuo-02`，6 或 10 秒，512P / 720P / 768P / 1080P），查询后取 `file_id` 再 `GET /v1/files/retrieve?file_id=…` 下载。两者都是「创建 → 查询 → 下载」三步异步。
+- 生图：`POST /v1/image_generation`，模型 `image-01` / `image-01-live`（两者都支持文生图与图生图）；宽高比 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`，其中 `21:9` 仅 `image-01`；`width`/`height` 仅 `image-01` 生效（必须成对、512–2048、8 的倍数；官方规则是两者同给时以宽高比为准，本插件改为以显式宽高为准、不再下发宽高比）；`style` 仅 `image-01-live` 生效（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）；`prompt` ≤ 1500 字符；`n` 1–9；`aigc_watermark` 默认 false；图生图通过 `subject_reference` 传参考图（`type` 目前只有 `character`，参考图为 JPG/JPEG/PNG 且小于 10MB）。
+- 视频：V2 接口 `POST /v2/video_generation`（`MiniMax-H3` 768P/2K、`MiniMax-H3-Highspeed` 480P/768P、`MiniMax-H3-Lite` 480P/768P、`MiniMax-H3-Max` 480P/768P；时长前三者 4–15 秒、`MiniMax-H3-Max` 5–15 秒），查询 `GET /v2/query/video_generation/{task_id}`，成片地址在 `task.content.url`；V1 接口 `POST /v1/video_generation`（`MiniMax-Hailuo-2.3` / `-Fast` / `Hailuo-02`，6 或 10 秒，512P / 720P / 768P / 1080P），查询后取 `file_id` 再 `GET /v1/files/retrieve?file_id=…` 下载。两者都是「创建 → 查询 → 下载」三步异步。
+- 视频 v2 的画幅规则：文生视频（只含 text）必须给具体比例，不能用 `adaptive`；图生视频（带首帧）比例固定为 `adaptive`；`MiniMax-H3-Lite` 暂不支持 `adaptive`。v2 的 `text` 上限 7000 字符（v1 仍为 2000）。
 - 语音合成：`POST /v1/t2a_v2`，模型 `speech-2.8-hd` / `-turbo`、`speech-2.6-hd` / `-turbo`、`speech-02-hd` / `-turbo`；响应 `data.audio` 为 hex 编码音频。
 - 语音转文字：`POST /v1/speech_to_text`（multipart），模型 `asr-1.0`，返回文本。
-- 来源：<https://platform.minimax.io/docs/api-reference/image-generation-t2i.md>、<https://platform.minimax.io/docs/api-reference/image-generation-i2i.md>、<https://platform.minimax.io/docs/api-reference/video-generation-v2-create.md>、<https://platform.minimax.io/docs/api-reference/video-generation-v2-query.md>、<https://platform.minimax.io/docs/api-reference/video-generation-t2v.md>、<https://platform.minimax.io/docs/api-reference/video-generation-download.md>、<https://platform.minimax.io/docs/api-reference/speech-t2a-http.md>、<https://platform.minimax.io/docs/api-reference/speech-to-text.md>
+- 来源：<https://platform.minimax.cn/docs/api-reference/api-overview>、<https://platform.minimax.cn/docs/api-reference/image-generation-t2i.md>、<https://platform.minimax.cn/docs/api-reference/image-generation-i2i.md>、<https://platform.minimax.cn/docs/api-reference/video-generation-v2-create.md>、<https://platform.minimax.io/docs/api-reference/video-generation-v2-query.md>、<https://platform.minimax.io/docs/api-reference/video-generation-t2v.md>、<https://platform.minimax.io/docs/api-reference/video-generation-download.md>、<https://platform.minimax.io/docs/api-reference/speech-t2a-http.md>、<https://platform.minimax.io/docs/api-reference/speech-to-text.md>
 
 ### 音乐能力已退役
 

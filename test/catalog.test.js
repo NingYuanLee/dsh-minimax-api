@@ -14,6 +14,13 @@ test('发现结果与内置常量合并，媒体模型不会进入对话清单',
   assert.equal(catalog.find(x => x.id === 'speech-02-hd').category, 'speech');
   assert.equal(catalog.find(x => x.id === 'music-3.0').category, 'music');
   assert.equal(catalog.find(x => x.id === 'music-3.0').retired, true, '音乐模型官方已退役');
+  // 官方视频 v2 共四个 H3 变体
+  for (const id of ['MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max']) {
+    assert.equal(catalog.find(x => x.id === id)?.category, 'video', id + ' 应归入视频类');
+  }
+  // image-01-live 同时支持文生图与图生图，备注不能写成「仅图生图」
+  assert.match(catalog.find(x => x.id === 'image-01-live').note, /画风|style/);
+  assert.doesNotMatch(catalog.find(x => x.id === 'image-01-live').note, /仅支持图生图/);
   // 只有对话模型进入模型选择器
   assert.deepEqual(chatModels(catalog).map(x => x.id), ['MiniMax-M3.1-Flash', 'MiniMax-M3']);
   assert.deepEqual(chatModels(catalog, [{ id: 'MiniMax-M3' }]).map(x => x.id), ['MiniMax-M3']);

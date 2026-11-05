@@ -183,20 +183,36 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
 
 已退役、不再可调用：`MiniMax-M2`、`M2.1`、`M2.5`、`M2.7`、`M2.7-highspeed`、`M1`、`Text-01`、`VL-01`、`abab6.5`。M Plan 用户会被自动路由到 `MiniMax-M3.1-Flash`。
 
+### 文本模型参数
+
+MiniMax 的文本参数由插件映射到 dsh 本来就负责这些参数的位置。这些参数按请求生效，所以控制入口是 dsh 的模型选择器与插件设置页的模型表，而不是另外一张表单：
+
+| MiniMax 参数 | 插件怎么处理 | 在哪里控制 |
+| --- | --- | --- |
+| `max_completion_tokens`（Chat Completions）/ `max_tokens`（Anthropic）/ `max_output_tokens`（Responses） | 按所选协议把输出上限写到对应字段；不会下发已废弃的 `max_tokens`（Chat Completions 下） | dsh 每次调用决定上限；模型表的「最大输出」列是目录默认值（推荐 131072，上限 524288） |
+| `reasoning_effort`（Chat Completions） | 以 `reasoning_effort` 下发 `low` / `medium` / `high` / `xhigh` / `max`；未选档位时不下发，交给服务端默认值（`max`） | 模型选择器里的推理等级；可选档位来自模型表的思考列 |
+| `output_config.effort`（Anthropic 兼容） | 以 `output_config.effort` 下发同样的五个档位 | 同一个推理等级 |
+| `thinking` | 只会下发 `adaptive`。Anthropic 通道强制自适应思考，因为 pi-ai 默认会发 `type: "enabled"` + `budget_tokens` 的 Anthropic 原生形式，MiniMax 不接受 | 隐式：`MiniMax-M3.1-Flash` 始终思考；`MiniMax-M3` 在选了档位时思考，否则沿用服务端默认 |
+| `reasoning_content` | 作为模型的思考通道解析；不下发开关（`reasoning_split` 默认就是拆分形态） | 只读 |
+| `temperature` / `top_p` | 不作为可调项下发；MiniMax 本来也忽略这两个值（固定 1 与 0.95） | 不可用 —— 上游会忽略 |
+| `service_tier`、`reasoning_split`、文本接口的 `seed` | 未暴露：适配器没有对应字段 | 不可用 |
+
+两条通道的差异需要知道：`MiniMax-M3` 在 OpenAI 兼容通道默认自适应思考，在 Anthropic 兼容通道默认不思考；`MiniMax-M3.1-Flash` 在两条通道都拒绝 `thinking: disabled`。插件因此从不下发「关闭思考」的请求。
+
 模型清单由 `GET {root}/v1/models` 与插件内置常量合并得到，因此即使发现接口只返回对话模型，媒体模型也仍然在列。设置页的模型表就是模型选择器看到的内容 —— 删掉一行并保存即可隐藏该模型。
 
 ### 媒体模型
 
 | 能力 | 模型 |
 | --- | --- |
-| 图片 | `image-01`、`image-01-live` |
-| 视频（v2 接口） | `MiniMax-H3`、`MiniMax-H3-Max` —— 4–15 秒 |
-| 视频（v1 接口） | `MiniMax-Hailuo-2.3`、`MiniMax-Hailuo-2.3-Fast`、`MiniMax-Hailuo-02` —— 6 秒或 10 秒，512P / 720P / 768P / 1080P |
+| 图片 | `image-01`（文生图与图生图）、`image-01-live`（同样支持文生图与图生图，另有画风设置） |
+| 视频（v2 接口） | `MiniMax-H3`（768P / 2K，4–15 秒）、`MiniMax-H3-Highspeed`（480P / 768P，4–15 秒）、`MiniMax-H3-Lite`（480P / 768P，4–15 秒，不支持 `adaptive` 画幅）、`MiniMax-H3-Max`（480P / 768P，5–15 秒） |
+| 视频（v1 接口） | `MiniMax-Hailuo-2.3`、`MiniMax-Hailuo-2.3-Fast`（仅图生视频）、`MiniMax-Hailuo-02` —— 6 秒或 10 秒，512P / 720P / 768P / 1080P |
 | 语音合成 | `speech-2.8-hd`、`speech-2.8-turbo`、`speech-2.6-hd`、`speech-2.6-turbo`、`speech-02-hd`、`speech-02-turbo` |
 | 语音转文字 | `asr-1.0` |
 | 音乐 | `music-3.0`、`music-2.6`、`music-cover` —— 已退役，见下 |
 
-生图支持的宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`，`prompt` 不超过 1500 字，`n` 取值 1–9。图生图通过 `subject_reference` 传参考图。
+生图支持的宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01` 支持），`prompt` 不超过 1500 字，`n` 取值 1–9。`image-01` 还支持显式的 `width`/`height`（512–2048 像素、8 的倍数，必须成对）；同时给出时插件以显式宽高为准、不再下发宽高比（官方规则是两者同给时以宽高比为准、会忽略宽高）。`image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。图生图通过 `subject_reference` 传参考图（人物主体参考：公网 URL 或 `data:image/jpeg;base64,…` Data URL，JPG/JPEG/PNG 且小于 10MB）。
 
 视频生成是三步异步流程：创建任务、查询任务、下载文件。插件会保留任务 id，因此 `minimax_media_status` 能在不重复提交的前提下取回成片。
 

@@ -183,20 +183,36 @@ The settings page writes the API key into the dsh credential service under the r
 
 Retired and no longer callable: `MiniMax-M2`, `M2.1`, `M2.5`, `M2.7`, `M2.7-highspeed`, `M1`, `Text-01`, `VL-01` and `abab6.5`. M Plan users are routed to `MiniMax-M3.1-Flash` automatically.
 
+### Text model parameters
+
+The plugin maps MiniMax's text parameters onto the dsh surfaces that own them. Parameters are per request, so they live in dsh's model picker and the plugin settings page's model table, not in a separate form:
+
+| MiniMax parameter | What the plugin does | Where you control it |
+| --- | --- | --- |
+| `max_completion_tokens` (Chat Completions) / `max_tokens` (Anthropic) / `max_output_tokens` (Responses) | Sends the request's output cap under the field that protocol expects — `max_tokens` is never sent, it is deprecated upstream | dsh picks the cap per call; the model table's max-output column is the catalog default (131,072 recommended, 524,288 hard cap) |
+| `reasoning_effort` (Chat Completions) | Sent as `reasoning_effort` with `low` / `medium` / `high` / `xhigh` / `max`; nothing is sent when no level is chosen, so the server keeps its default (`max`) | Reasoning level in the model picker; the levels on offer come from the model table's reasoning column |
+| `output_config.effort` (Anthropic-compatible) | Sent as `output_config.effort` with the same five levels | Same reasoning level |
+| `thinking` | Only `adaptive` is ever sent. On the Anthropic route the plugin forces adaptive thinking, because pi-ai's default budget form (`type: "enabled"`, `budget_tokens`) is not accepted by MiniMax | Implicit: `MiniMax-M3.1-Flash` always thinks; `MiniMax-M3` thinks when a level is selected, otherwise the server default stands |
+| `reasoning_content` | Parsed as the model's thinking channel; no switch is sent (`reasoning_split` defaults to the split form) | Read-only |
+| `temperature` / `top_p` | Not sent as user knobs; MiniMax ignores them anyway (fixed at 1 and 0.95) | Not available — upstream ignores the value |
+| `service_tier`, `reasoning_split`, `seed` for text | Not exposed: the adapter has no field for them | Not available |
+
+Two route differences worth knowing: `MiniMax-M3` defaults to adaptive thinking on the OpenAI-compatible route but to no thinking on the Anthropic-compatible route, and `MiniMax-M3.1-Flash` rejects `thinking: disabled` on both. The plugin therefore never sends a disable request.
+
 The catalog is the merge of `GET {root}/v1/models` and the plugin's built-in constants, so the media models below stay listed even when the discovery endpoint only returns chat models. The settings page's model table is what the picker shows — delete a row and save to hide that model.
 
 ### Media models
 
 | Capability | Models |
 | --- | --- |
-| Image | `image-01`, `image-01-live` |
-| Video (v2 endpoint) | `MiniMax-H3`, `MiniMax-H3-Max` — 4–15 s |
-| Video (v1 endpoint) | `MiniMax-Hailuo-2.3`, `MiniMax-Hailuo-2.3-Fast`, `MiniMax-Hailuo-02` — 6 s or 10 s, 512P / 720P / 768P / 1080P |
+| Image | `image-01` (text and image to image), `image-01-live` (same, plus style settings) |
+| Video (v2 endpoint) | `MiniMax-H3` (768P / 2K, 4–15 s), `MiniMax-H3-Highspeed` (480P / 768P, 4–15 s), `MiniMax-H3-Lite` (480P / 768P, 4–15 s, no `adaptive` ratio), `MiniMax-H3-Max` (480P / 768P, 5–15 s) |
+| Video (v1 endpoint) | `MiniMax-Hailuo-2.3`, `MiniMax-Hailuo-2.3-Fast` (image to video only), `MiniMax-Hailuo-02` — 6 s or 10 s, 512P / 720P / 768P / 1080P |
 | Speech | `speech-2.8-hd`, `speech-2.8-turbo`, `speech-2.6-hd`, `speech-2.6-turbo`, `speech-02-hd`, `speech-02-turbo` |
 | Speech to text | `asr-1.0` |
 | Music | `music-3.0`, `music-2.6`, `music-cover` — retired, see below |
 
-Image generation accepts an aspect ratio of `1:1`, `16:9`, `4:3`, `3:2`, `2:3`, `3:4`, `9:16` or `21:9`, a prompt of at most 1500 characters and `n` between 1 and 9. Image-to-image passes the reference image as `subject_reference`.
+Image generation accepts an aspect ratio of `1:1`, `16:9`, `4:3`, `3:2`, `2:3`, `3:4`, `9:16` or `21:9` — `21:9` is `image-01` only — a prompt of at most 1500 characters and `n` between 1 and 9. `image-01` also accepts an explicit `width`/`height` pair (512–2048 px, multiples of 8, both required); when both are given the plugin honours the explicit pixel size and does not send `aspect_ratio` (upstream would otherwise ignore `width`/`height`). `image-01-live` additionally accepts a `style` object (`style_type` 漫画 / 元气 / 中世纪 / 水彩, `style_weight` in (0, 1]). Image-to-image passes the reference image as `subject_reference` (a `character` reference: a public URL or a `data:image/jpeg;base64,…` Data URL, JPG/JPEG/PNG under 10 MB).
 
 Video generation is asynchronous in three steps: create the task, query the task, then download the file. The plugin keeps the task id, so `minimax_media_status` can fetch the finished clip without submitting a new one.
 

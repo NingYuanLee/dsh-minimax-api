@@ -21,10 +21,12 @@
 
 ## 生图
 
-- 模型：`image-01`、`image-01-live`。
-- 宽高比：`1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`。
-- `prompt` 上限 1500 字符；`n` 取值 1–9。
-- 图生图通过 `subject_reference` 传参考图（`type` 目前只有 `character`），参考图支持公网 URL 或 `data:image/jpeg;base64,...`。
+- 模型：`image-01`、`image-01-live`（两者都支持文生图与图生图）。
+- 宽高比：`1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01`）。
+- `image-01` 可显式给 `width`/`height`（必须成对，512–2048，8 的倍数）；与宽高比同时给出时以宽高比为准。
+- `image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。
+- `prompt` 上限 1500 字符；`n` 取值 1–9；`aigc_watermark` 默认为 false。
+- 图生图通过 `subject_reference` 传参考图（`type` 目前只有 `character`，人物主体参考），参考图支持公网 URL 或 `data:image/jpeg;base64,...`，格式 JPG/JPEG/PNG 且小于 10MB。
 - 上游返回 `data.image_urls`（默认 URL 形态，24 小时有效）或 `data.image_base64`；插件下载到本地后再交回路径，因此结果不依赖上游链接的有效期。
 
 ## 视频：两代接口与三步异步
@@ -33,8 +35,10 @@ MiniMax 有两代视频接口并存，插件按模型选择：
 
 | 代 | 模型 | 时长 | 分辨率 | 创建 | 查询 | 下载 |
 | --- | --- | --- | --- | --- | --- | --- |
-| v2 | `MiniMax-H3`、`MiniMax-H3-Max` | 4–15 秒（Max 为 5–15 秒） | 480P / 768P（`MiniMax-H3` 另支持 2K） | `POST /v2/video_generation` | `GET /v2/query/video_generation/{task_id}` | 成片地址直接在 `task.content.url` |
+| v2 | `MiniMax-H3`（768P/2K）、`MiniMax-H3-Highspeed`（480P/768P）、`MiniMax-H3-Lite`（480P/768P）、`MiniMax-H3-Max`（480P/768P） | 4–15 秒（Max 为 5–15 秒） | 见左 | `POST /v2/video_generation` | `GET /v2/query/video_generation/{task_id}` | 成片地址直接在 `task.content.url` |
 | v1 | `MiniMax-Hailuo-2.3`、`MiniMax-Hailuo-2.3-Fast`、`MiniMax-Hailuo-02` | 6 秒或 10 秒 | 512P / 720P / 768P / 1080P | `POST /v1/video_generation` | `GET /v1/query/video_generation?task_id=…` | `GET /v1/files/retrieve?file_id=…` 取 `download_url` |
+
+v2 的画幅规则：文生视频（只含文本）必须给具体比例，不能用 `adaptive`；图生视频（带首帧）比例固定为 `adaptive`；`MiniMax-H3-Lite` 暂不支持 `adaptive`。v2 的提示词上限 7000 字符，v1 为 2000。
 
 三步流程对用户是一样的：
 

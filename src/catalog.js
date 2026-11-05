@@ -23,13 +23,15 @@ export const CHAT_MODELS = [
 
 // 媒体能力模型。发现接口未必列出这些模型，因此内置一份常量兜底。
 export const MEDIA_MODELS = [
-  { id: 'image-01', category: 'image' },
-  { id: 'image-01-live', category: 'image', note: '仅支持图生图' },
-  { id: 'MiniMax-H3', category: 'video' },
-  { id: 'MiniMax-H3-Max', category: 'video' },
-  { id: 'MiniMax-Hailuo-2.3', category: 'video' },
-  { id: 'MiniMax-Hailuo-2.3-Fast', category: 'video' },
-  { id: 'MiniMax-Hailuo-02', category: 'video' },
+  { id: 'image-01', category: 'image', note: '文生图与图生图，支持 21:9 与指定宽高' },
+  { id: 'image-01-live', category: 'image', note: '在 image-01 基础上额外支持画风设置（style），不支持 21:9' },
+  { id: 'MiniMax-H3', category: 'video', note: 'v2 接口，768P/2K，4–15 秒' },
+  { id: 'MiniMax-H3-Highspeed', category: 'video', note: 'v2 接口，480P/768P，4–15 秒' },
+  { id: 'MiniMax-H3-Lite', category: 'video', note: 'v2 接口，480P/768P，4–15 秒，不支持 adaptive 画幅' },
+  { id: 'MiniMax-H3-Max', category: 'video', note: 'v2 接口，480P/768P，5–15 秒' },
+  { id: 'MiniMax-Hailuo-2.3', category: 'video', note: 'v1 接口，6 或 10 秒' },
+  { id: 'MiniMax-Hailuo-2.3-Fast', category: 'video', note: 'v1 接口，6 或 10 秒，仅图生视频' },
+  { id: 'MiniMax-Hailuo-02', category: 'video', note: 'v1 接口，6 或 10 秒' },
   { id: 'speech-2.8-hd', category: 'speech' },
   { id: 'speech-2.8-turbo', category: 'speech' },
   { id: 'speech-2.6-hd', category: 'speech' },

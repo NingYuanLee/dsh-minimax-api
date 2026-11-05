@@ -20,6 +20,12 @@ export const VIDEO_DURATIONS_V2 = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 export const VIDEO_RATIOS_V2 = ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
 // 官方文档给出的语音输出格式。
 export const AUDIO_FORMATS = ['mp3', 'pcm', 'flac', 'wav', 'pcmu_raw', 'pcmu_wav', 'opus'];
+// 生图画风，仅 image-01-live 支持。
+export const IMAGE_STYLE_TYPES = ['漫画', '元气', '中世纪', '水彩'];
+// v2 视频的提示词扩展模式，仅 MiniMax-H3-Max 支持。
+export const PROMPT_EXPANSION_MODES = ['disabled', 'balanced', 'quality'];
+// v2 视频的四个模型。
+export const VIDEO_V2_MODELS = ['MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max'];
 // 官方文档给出的语音音色情绪。
 export const VOICE_EMOTIONS = ['happy', 'sad', 'angry', 'fearful', 'disgusted', 'surprised', 'calm', 'fluent', 'whisper'];
 // 转写接口的输入与时长上限。
@@ -153,7 +159,7 @@ export async function requestJson({ apiRoot, apiKey, fetchImpl = fetch, signal, 
 }
 
 // 文生图与图生图共用一个端点：图生图多传 subject_reference。
-export async function createImage({ apiRoot, apiKey, fetchImpl, signal, model = 'image-01', prompt, aspect_ratio, width, height, n, seed, prompt_optimizer, response_format = 'url', subject_reference }) {
+export async function createImage({ apiRoot, apiKey, fetchImpl, signal, model = 'image-01', prompt, aspect_ratio, width, height, n, seed, prompt_optimizer, response_format = 'url', subject_reference, style, aigc_watermark }) {
   const body = { model, prompt };
   if (aspect_ratio) body.aspect_ratio = aspect_ratio;
   if (Number.isInteger(width)) body.width = width;
@@ -163,6 +169,12 @@ export async function createImage({ apiRoot, apiKey, fetchImpl, signal, model = 
   if (typeof prompt_optimizer === 'boolean') body.prompt_optimizer = prompt_optimizer;
   if (response_format) body.response_format = response_format;
   if (Array.isArray(subject_reference) && subject_reference.length) body.subject_reference = subject_reference;
+  // 画风只对 image-01-live 生效，校验在 media.js 里做。
+  if (style && typeof style === 'object' && style.style_type) {
+    body.style = { style_type: style.style_type };
+    if (Number.isFinite(style.style_weight)) body.style.style_weight = style.style_weight;
+  }
+  if (typeof aigc_watermark === 'boolean') body.aigc_watermark = aigc_watermark;
   const payload = await requestJson({ apiRoot, apiKey, fetchImpl, signal, method: 'POST', path: '/v1/image_generation', body });
   const urls = pickList(payload, 'image_urls');
   const base64 = pickList(payload, 'image_base64');
@@ -188,7 +200,7 @@ export async function createVideoV1({ apiRoot, apiKey, fetchImpl, signal, model,
 }
 
 // v2 视频（H3 系）：多模态 content 数组，resolution 与 duration 必填。
-export async function createVideoV2({ apiRoot, apiKey, fetchImpl, signal, model, content, resolution, duration, ratio, extra }) {
+export async function createVideoV2({ apiRoot, apiKey, fetchImpl, signal, model, content, resolution, duration, ratio, extra, aigc_watermark }) {
   const body = {
     model,
     content: Array.isArray(content) && content.length ? content : [{ type: 'text', text: '' }],
@@ -196,7 +208,11 @@ export async function createVideoV2({ apiRoot, apiKey, fetchImpl, signal, model,
     duration,
   };
   if (ratio) body.ratio = ratio;
-  if (extra && typeof extra === 'object') body.extra = extra;
+  // extra 是封闭对象，只有 prompt_expansion_mode 一个键。
+  if (extra && typeof extra === 'object' && extra.prompt_expansion_mode) {
+    body.extra = { prompt_expansion_mode: extra.prompt_expansion_mode };
+  }
+  if (typeof aigc_watermark === 'boolean') body.aigc_watermark = aigc_watermark;
   const payload = await requestJson({ apiRoot, apiKey, fetchImpl, signal, method: 'POST', path: '/v2/video_generation', body });
   const taskId = typeof payload?.task_id === 'string' ? payload.task_id : '';
   if (!taskId) throw new MiniMaxError('MiniMax 视频接口没有返回任务 ID');

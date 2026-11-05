@@ -233,3 +233,97 @@ test('后台轮询在结果就绪后保存视频，不会重复提交', async t 
   assert.equal(posts, 1);
   assert.ok(updates.includes('saved'));
 });
+
+test('生图：画风仅 image-01-live 可用，参数合法才下发', async t => {
+  let body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v1/image_generation') { body = JSON.parse(await readBody(req)); json(res, { data: { image_urls: [`http://${req.headers.host}/image`] }, base_resp: { status_code: 0 } }); }
+    else { res.writeHead(200, { 'content-type': 'image/png' }); res.end(png); }
+  });
+  const ok = await f.manager.image({ model: 'image-01-live', prompt: 'x', style_type: '漫画', style_weight: 0.5 }, 's');
+  assert.equal(ok.status, 'saved');
+  assert.deepEqual(body.style, { style_type: '漫画', style_weight: 0.5 });
+  await assert.rejects(f.manager.image({ model: 'image-01', prompt: 'x', style_type: '漫画' }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01-live', prompt: 'x', style_type: '赛博朋克' }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01-live', prompt: 'x', style_type: '漫画', style_weight: 0 }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01-live', prompt: 'x', style_type: '漫画', style_weight: 1.5 }, 's'));
+});
+
+test('生图：21:9 仅 image-01；width/height 成对、8 的倍数且不下发 aspect_ratio', async t => {
+  let body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v1/image_generation') { body = JSON.parse(await readBody(req)); json(res, { data: { image_urls: [`http://${req.headers.host}/image`] }, base_resp: { status_code: 0 } }); }
+    else { res.writeHead(200, { 'content-type': 'image/png' }); res.end(png); }
+  });
+  await assert.rejects(f.manager.image({ model: 'image-01-live', prompt: 'x', aspect_ratio: '21:9' }, 's'));
+  const wide = await f.manager.image({ model: 'image-01', prompt: 'x', aspect_ratio: '21:9' }, 's');
+  assert.equal(wide.status, 'saved'); assert.equal(body.aspect_ratio, '21:9');
+  await assert.rejects(f.manager.image({ model: 'image-01', prompt: 'x', width: 1024 }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01', prompt: 'x', height: 1024 }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01', prompt: 'x', width: 256, height: 256 }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01', prompt: 'x', width: 1024, height: 770 }, 's'));
+  await assert.rejects(f.manager.image({ model: 'image-01-live', prompt: 'x', width: 1024, height: 1024 }, 's'));
+  const sized = await f.manager.image({ model: 'image-01', prompt: 'x', width: 1024, height: 768, aspect_ratio: '16:9' }, 's');
+  assert.equal(sized.status, 'saved');
+  assert.equal(body.width, 1024); assert.equal(body.height, 768); assert.equal(body.aspect_ratio, undefined);
+});
+
+test('生图：aigc_watermark 透传', async t => {
+  let body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v1/image_generation') { body = JSON.parse(await readBody(req)); json(res, { data: { image_urls: [`http://${req.headers.host}/image`] }, base_resp: { status_code: 0 } }); }
+    else { res.writeHead(200, { 'content-type': 'image/png' }); res.end(png); }
+  });
+  await f.manager.image({ model: 'image-01', prompt: 'x', aigc_watermark: true }, 's');
+  assert.equal(body.aigc_watermark, true);
+});
+
+test('v2 视频：文生视频不能用 adaptive，带首帧时固定 adaptive', async t => {
+  let body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v2/video_generation') { body = JSON.parse(await readBody(req)); json(res, { task_id: 'h3-r' }); }
+    else { res.writeHead(200, { 'content-type': 'video/mp4' }); res.end(mp4); }
+  });
+  await assert.rejects(f.manager.video({ model: 'MiniMax-H3', prompt: 'x', ratio: 'adaptive' }, 's'));
+  await f.manager.video({ model: 'MiniMax-H3', prompt: 'x', image_url: 'https://cdn.example/still.png' }, 's');
+  assert.equal(body.ratio, 'adaptive');
+  assert.equal(body.content[1].role, 'first_frame');
+});
+
+test('v2 视频：H3-Highspeed / H3-Lite 支持 480P、不支持 2K；MiniMax-H3 不支持 480P', async t => {
+  const f = await fixture(t, (req, res) => {
+    if (req.url === '/v2/video_generation') json(res, { task_id: 'h3-s' });
+    else { res.writeHead(200, { 'content-type': 'video/mp4' }); res.end(mp4); }
+  });
+  for (const model of ['MiniMax-H3-Highspeed', 'MiniMax-H3-Lite']) {
+    await assert.rejects(f.manager.video({ model, prompt: 'x', resolution: '2K' }, 's'));
+    const ok = await f.manager.video({ model, prompt: 'x', resolution: '480P' }, 's');
+    assert.equal(ok.status, 'generating');
+  }
+  await assert.rejects(f.manager.video({ model: 'MiniMax-H3', prompt: 'x', resolution: '480P' }, 's'));
+  const h3 = await f.manager.video({ model: 'MiniMax-H3', prompt: 'x', resolution: '2K' }, 's');
+  assert.equal(h3.status, 'generating');
+});
+
+test('v2 视频：提示词扩展模式仅 H3-Max 支持', async t => {
+  let body = null;
+  const f = await fixture(t, async (req, res) => {
+    if (req.url === '/v2/video_generation') { body = JSON.parse(await readBody(req)); json(res, { task_id: 'h3-e' }); }
+    else { res.writeHead(200, { 'content-type': 'video/mp4' }); res.end(mp4); }
+  });
+  await assert.rejects(f.manager.video({ model: 'MiniMax-H3', prompt: 'x', prompt_expansion_mode: 'quality' }, 's'));
+  await assert.rejects(f.manager.video({ model: 'MiniMax-H3-Max', prompt: 'x', prompt_expansion_mode: 'balance' }, 's'));
+  await f.manager.video({ model: 'MiniMax-H3-Max', prompt: 'x', prompt_expansion_mode: 'quality' }, 's');
+  assert.deepEqual(body.extra, { prompt_expansion_mode: 'quality' });
+});
+
+test('视频 prompt 长度：v2 到 7000，v1 到 2000', async t => {
+  const f = await fixture(t, (req, res) => {
+    if (req.url.endsWith('/video_generation')) json(res, { task_id: 't' });
+    else { res.writeHead(200, { 'content-type': 'video/mp4' }); res.end(mp4); }
+  });
+  const ok = await f.manager.video({ model: 'MiniMax-H3', prompt: 'x'.repeat(7000) }, 's');
+  assert.equal(ok.status, 'generating');
+  await assert.rejects(f.manager.video({ model: 'MiniMax-H3', prompt: 'x'.repeat(7001) }, 's'));
+  await assert.rejects(f.manager.video({ model: 'MiniMax-Hailuo-02', prompt: 'x'.repeat(2001) }, 's'));
+});

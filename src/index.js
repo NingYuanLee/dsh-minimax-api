@@ -139,9 +139,15 @@ export async function apply(ctx, config) {
       const models = chatModels(next, config.modelOverrides.get());
       if (models.length) {
         const api = captured.api === 'openai-responses' ? 'openai-responses' : captured.api === 'anthropic-messages' ? 'anthropic-messages' : 'openai-completions';
-        // thinkingFormat / maxTokensField 只属于 Chat Completions。MiniMax 用 max_completion_tokens，
-        // 思考内容走 reasoning_content；Responses 与 Anthropic 通道不接受这些兼容开关。
-        const compat = api === 'openai-completions' ? { thinkingFormat: 'openai', maxTokensField: 'max_completion_tokens' } : {};
+        // 文本参数按 MiniMax 官方文档逐项对齐（platform.minimax.cn/docs/api-reference）：
+        // - Chat Completions：输出上限走 max_completion_tokens（max_tokens 已废弃）；思考深度走
+        //   reasoning_effort（low/medium/high/xhigh/max），思考内容在 reasoning_content。
+        // - Anthropic 兼容：MiniMax 只接受 thinking:{type:'adaptive'}，思考深度走 output_config.effort。
+        //   pi-ai 默认会发 Anthropic 原生的 budget_tokens 形式，MiniMax 不接受，所以必须强制自适应思考。
+        // - Responses：用 reasoning.effort 与 max_output_tokens，不需要额外兼容开关。
+        const compat = api === 'openai-completions'
+          ? { thinkingFormat: 'openai', maxTokensField: 'max_completion_tokens', supportsReasoningEffort: true }
+          : api === 'anthropic-messages' ? { forceAdaptiveThinking: true } : {};
         const adapter = buildChatAdapter(ctx, { displayName: 'MiniMax', api, baseURL, apiKeyEnv: captured.apiKeyEnv, models, compat });
         // Build the next snapshot before removing a healthy registration.
         await adapter.listModels(name);
