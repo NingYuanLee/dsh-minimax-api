@@ -175,8 +175,8 @@ test('地址为空时获取模型仍带上默认地址', async () => {
   const Client = loadClient();
   const current = mount(Client, { state: { connection: { baseURL: '' }, media: {}, modelOverrides: [] } });
   await buttonByText(current(), '获取模型').props.onClick();
-  assert.equal(current.seen[0].baseURL, BASE_URL);
-  assert.equal(current.seen[0].api, 'openai-completions');
+  assert.equal(current.seen[0].baseURL, 'https://api.minimax.cn/anthropic');
+  assert.equal(current.seen[0].api, 'anthropic-messages');
 });
 
 test('插件详情页等配置读完再自动获取，不用空地址', async () => {
@@ -533,14 +533,17 @@ test('保存时把密钥写入凭据库，配置里不留明文', async () => {
 test('空地址回显默认值，保存写入同一地址', async () => {
   const Client = loadClient();
   const calls = [];
+  const defaultBaseURL = 'https://api.minimax.cn/anthropic';
   const current = mount(Client, {
     state: { connection: { baseURL: '' }, media: {}, modelOverrides: [] },
     mutate: async ops => { calls.push(ops); return true; },
   });
-  assert.equal(byLabel(current(), 'API 地址').props.value, BASE_URL);
+  assert.equal(byLabel(current(), 'API 地址').props.value, defaultBaseURL);
   await buttonByText(current(), '保存地址和密钥').props.onClick();
   const connection = calls[0].find(op => op.path[0] === 'connection').value;
-  assert.equal(connection.baseURL, BASE_URL);
+  assert.equal(connection.baseURL, defaultBaseURL);
+  assert.equal(connection.plan, 'coding-cn');
+  assert.equal(connection.api, 'anthropic-messages');
   assert.equal(connection.apiKey, '');
 });
 
@@ -560,18 +563,19 @@ test('保存连接时把接入方式、地址和协议一起写入', async () =>
 test('切换 API 协议时地址自动换成对应的官方路径', async () => {
   const Client = loadClient();
   const calls = [];
-  const current = mount(Client, { mutate: async ops => { calls.push(ops); return true; } });
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.io/v1', '默认按量付费走 /v1');
-  byLabel(current(), 'API 协议').props.onChange({ target: { value: 'anthropic-messages' } });
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.io/anthropic', 'Anthropic 协议要用 /anthropic');
-  assert.equal(byLabel(current(), '接入方式').props.value, 'coding-global', '地址与协议都匹配预设时同步接入方式');
+  const current = mount(Client, { state: { connection: {}, media: {}, modelOverrides: [] }, mutate: async ops => { calls.push(ops); return true; } });
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/anthropic', '默认国内 M Plan 走 /anthropic');
+  assert.equal(byLabel(current(), '接入方式').props.value, 'coding-cn');
+  byLabel(current(), 'API 协议').props.onChange({ target: { value: 'openai-completions' } });
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/v1', 'OpenAI 协议要用 /v1');
+  assert.equal(byLabel(current(), '接入方式').props.value, 'payg-cn', '地址与协议都匹配预设时同步接入方式');
   byLabel(current(), 'API 协议').props.onChange({ target: { value: 'openai-responses' } });
-  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.io/v1', 'OpenAI 协议回到 /v1');
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/v1', 'Responses 也走 /v1');
   assert.equal(byLabel(current(), '接入方式').props.value, 'custom', 'Responses 不属于任何预设组合，标为自定义');
   await buttonByText(current(), '保存地址和密钥').props.onClick();
   const connection = calls[0].find(op => op.path[0] === 'connection').value;
   assert.equal(connection.api, 'openai-responses');
-  assert.equal(connection.baseURL, 'https://api.minimax.io/v1');
+  assert.equal(connection.baseURL, 'https://api.minimax.cn/v1');
 });
 
 test('自定义代理地址不被协议切换改写', () => {

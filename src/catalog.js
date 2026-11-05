@@ -55,7 +55,8 @@ export const PLAN_PRESETS = {
   custom: { baseURL: '', api: 'openai-completions' },
 };
 
-export const DEFAULT_PLAN = 'payg-global';
+// 默认接入方式：国内 M Plan + Anthropic 兼容（官方推荐通道）。
+export const DEFAULT_PLAN = 'coding-cn';
 
 export function defaultReasoningEfforts(id) {
   const found = CHAT_MODELS.find(model => model.id === id);

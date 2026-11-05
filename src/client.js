@@ -330,7 +330,8 @@ const PROVIDER_ID = 'minimax-byapi';
 // 设置页与只读页里显示的提供商名称。
 const PROVIDER_NAME = 'MiniMax';
 // 与 Config.connection.baseURL 的 schema 默认值一致（按量付费·国际）。详情页没有表单，首屏 connection 是空的。
-const DEFAULT_BASE_URL = 'https://api.minimax.io/v1';
+// 默认接入方式：国内 M Plan + Anthropic 兼容（官方推荐），与 src/catalog.js 的 DEFAULT_PLAN 保持一致。
+const DEFAULT_BASE_URL = 'https://api.minimax.cn/anthropic';
 // 接入方式：预设同时决定 API 地址和协议；custom 保留用户手填的值。
 const ACCESS_PLANS = [
   { id: 'payg-global', baseURL: 'https://api.minimax.io/v1', api: 'openai-completions' },
@@ -351,12 +352,12 @@ function resolvePlan(source) {
   const baseURL = typeof source?.connection?.baseURL === 'string' ? source.connection.baseURL.trim() : '';
   const matched = ACCESS_PLANS.find(plan => plan.baseURL && plan.baseURL === baseURL);
   if (matched) return matched.id;
-  return baseURL ? 'custom' : 'payg-global';
+  return baseURL ? 'custom' : 'coding-cn';
 }
 function resolveApi(source) {
   const api = source?.connection?.api;
   if (typeof api === 'string' && API_PROTOCOLS.includes(api)) return api;
-  return planById(resolvePlan(source))?.api || 'openai-completions';
+  return planById(resolvePlan(source))?.api || 'anthropic-messages';
 }
 function resolveBaseURL(source) {
   const raw = source?.connection?.baseURL;
@@ -953,8 +954,7 @@ export function MinimaxSettings(props) {
           onChange: event => applyPlan(event.target.value), style: ui.control,
         }, ...ACCESS_PLANS.map(plan => h('option', { key: plan.id, value: plan.id }, t('settings.plan.' + plan.id))))),
       h('p', { style: ui.hint }, t('settings.plan.hint')),
-      h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 12 } },
-        field('connection', 'baseURL', t('settings.apiAddress')),
+      h('div', { style: { display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 12 } },
         h('label', { style: ui.label }, t('settings.apiProtocol'),
           h('select', {
             value: apiId,
@@ -964,7 +964,8 @@ export function MinimaxSettings(props) {
           },
           h('option', { value: 'openai-completions' }, 'Chat Completions'),
           h('option', { value: 'openai-responses' }, 'Responses'),
-          h('option', { value: 'anthropic-messages' }, 'Anthropic Messages')))),
+          h('option', { value: 'anthropic-messages' }, 'Anthropic Messages'))),
+        field('connection', 'baseURL', t('settings.apiAddress'))),
       h('p', { style: ui.hint }, t('settings.protocolHint')),
       h('label', { style: ui.label }, t('settings.apiKey'),
         h('input', { type: 'password', autoComplete: 'new-password', value: keyDraft, disabled: busy, placeholder: t('settings.apiKeyPlaceholder'),

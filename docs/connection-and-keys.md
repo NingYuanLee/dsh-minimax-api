@@ -14,6 +14,8 @@
 | `coding-cn` | M Plan 订阅，国内站 | `https://api.minimax.cn/anthropic` | `anthropic-messages` |
 | `custom` | 自建网关或其他端点 | 留空手填 | `openai-completions`（可改） |
 
+默认接入方式是 **`coding-cn`**（国内 M Plan + `anthropic-messages`），即首次打开就指向 `https://api.minimax.cn/anthropic`。设置页把协议选择放在地址左边，改协议时会自动改写官方地址的路径。
+
 对话协议可选 `openai-completions`、`openai-responses`、`anthropic-messages` 三种。走 Chat Completions 时插件使用 MiniMax 的兼容开关：`max_completion_tokens`（而非已废弃的 `max_tokens`）与 `reasoning_content` 思考字段；Responses 与 Anthropic 通道不接受这两个兼容开关，因此插件只在 `openai-completions` 下启用它们。
 
 官方主机上地址前缀与协议是配对的：`/v1` 对应 OpenAI 兼容（`openai-completions` / `openai-responses`），`/anthropic` 对应 `anthropic-messages`。设置页切换协议时会自动把官方地址换成对应路径，并按「地址 + 协议」重新判定接入方式（两者都命中预设才算预设，否则标为 `custom`）；自建地址不会被改写。

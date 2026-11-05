@@ -58,14 +58,14 @@ function english(Client) {
   return Client.exports.createT(Client.exports.en);
 }
 
-function mountSettings(Client, t) {
+function mountSettings(Client, t, state) {
   const runtime = Client.runtime;
   runtime.cursor = 0;
   runtime.hooks = [];
   runtime.effects = [];
   runtime.refs = {};
   const form = {
-    state: { value: { connection: { baseURL: 'https://api.minimax.io/v1', timeoutMs: 60000 }, media: {}, modelOverrides: [] }, revision: 5, writable: true },
+    state: { value: state || { connection: { baseURL: 'https://api.minimax.io/v1', timeoutMs: 60000 }, media: {}, modelOverrides: [] }, revision: 5, writable: true },
     mutate: async () => true,
   };
   const remote = { llm: { discoverModels: async () => [] }, credentials: { set: async () => ({ ok: true }) } };
@@ -158,14 +158,16 @@ test('中文回退界面保持原有文案（旧宿主/不传 t）', () => {
   assert.match(textsOf(current()), /生成音乐/);
 });
 
-test('接入方式下拉列出五个选项，默认按量付费（国际）', () => {
+test('接入方式下拉列出五个选项，默认国内 M Plan（Anthropic 兼容）', () => {
   const Client = loadClient();
-  const current = mountSettings(Client);
+  const current = mountSettings(Client, undefined, { connection: {}, media: {}, modelOverrides: [] });
   const select = byLabel(current(), '接入方式');
-  assert.equal(select.props.value, 'payg-global');
+  assert.equal(select.props.value, 'coding-cn');
   const options = walk(select).filter(n => n.type === 'option').map(n => n.props.value);
   assert.deepEqual(options, ['payg-global', 'payg-cn', 'coding-global', 'coding-cn', 'custom']);
-  assert.match(textsOf(current()), /按量付费（国际）/);
+  assert.match(textsOf(current()), /订阅 M Plan（国内）/);
+  assert.equal(byLabel(current(), 'API 协议').props.value, 'anthropic-messages', '默认协议是官方推荐的 Anthropic 兼容');
+  assert.equal(byLabel(current(), 'API 地址').props.value, 'https://api.minimax.cn/anthropic');
 });
 
 test('选接入方式会同时填入地址和协议；选自定义不清空已填的值', () => {

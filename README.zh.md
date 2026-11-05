@@ -82,6 +82,8 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 
 官方主机上地址与协议是配对的：`/v1` 说 OpenAI 兼容，`/anthropic` 说 Anthropic 兼容。在设置页切换协议会自动把地址改成对应路径，切换接入方式则两者一起填；自定义地址不会被改写。
 
+设置页默认就是 **`coding-cn` + `anthropic-messages`**，即新装好就指向 `https://api.minimax.cn/anthropic`——国内 M Plan 走官方推荐协议。协议选择在地址左边，改协议时地址会跟着换。
+
 **官方推荐 Anthropic 兼容通道**（文档里标注「推荐」，SDK 示例也以它为主）。它用同一把 Bearer Key 提供同样两款模型，而且是唯一让思考深度走 `output_config.effort` 的通道。想按推荐默认值用，选 `coding-global` / `coding-cn`；两类 Key 在这条通道上都能用。
 
 ### M Plan 额度
@@ -154,9 +156,9 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
   name: dsh-minimax-byapi
   config:
     connection:
-      plan: payg-global
-      baseURL: https://api.minimax.io/v1
-      api: openai-completions
+      plan: coding-cn
+      baseURL: https://api.minimax.cn/anthropic
+      api: anthropic-messages
       apiKeyEnv: MINIMAX_API_KEY
       verify: true
       timeoutMs: 60000
@@ -170,11 +172,11 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `connection.plan` | `payg-global` | 接入方式：`payg-global`、`payg-cn`、`coding-global`、`coding-cn`、`custom`，用于填 `baseURL` 与 `api`。 |
-| `connection.baseURL` | `https://api.minimax.io/v1` | API 地址。非本机地址必须使用 HTTPS，路径会被规整成 `/v1` 或 `/anthropic`。 |
+| `connection.plan` | `coding-cn` | 接入方式：`payg-global`、`payg-cn`、`coding-global`、`coding-cn`、`custom`，用于填 `baseURL` 与 `api`。默认是国内 M Plan + 官方推荐的 Anthropic 兼容。 |
+| `connection.baseURL` | `https://api.minimax.cn/anthropic` | API 地址。非本机地址必须使用 HTTPS，路径会被规整成 `/v1` 或 `/anthropic`。 |
 | `connection.apiKey` | 空 | 直接填写调用密钥，优先于凭据引用。仅供本地测试，正常使用请留空。 |
 | `connection.apiKeyEnv` | `MINIMAX_API_KEY` | dsh 凭据服务中的引用名。 |
-| `connection.api` | `openai-completions` | 对话协议：`openai-completions`、`openai-responses` 或 `anthropic-messages`。 |
+| `connection.api` | `anthropic-messages` | 对话协议：`openai-completions`、`openai-responses` 或 `anthropic-messages`。 |
 | `connection.verify` | `true` | 保存设置时用已保存的密钥校验一次 `GET {root}/v1/models`。 |
 | `connection.timeoutMs` | `60000` | 单次请求超时（毫秒，1000–600000）。 |
 | `media.imageModel` | 空 | 调用未指定 `model` 时使用的图片模型。 |

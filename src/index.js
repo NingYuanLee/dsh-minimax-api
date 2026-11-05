@@ -25,7 +25,7 @@ export const Config = z.object({
     // 直接填写调用密钥（优先于凭据引用）。留空才回退到 apiKeyEnv。
     apiKey: z.string().default(''),
     apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_KEY_REF),
-    api: z.union(['openai-completions', 'openai-responses', 'anthropic-messages']).default('openai-completions'),
+    api: z.union(['openai-completions', 'openai-responses', 'anthropic-messages']).default(PLAN_PRESETS[DEFAULT_PLAN].api),
     // 保存设置时先用该密钥验证一次模型列表，密钥不对立刻报错。
     verify: z.boolean().default(true),
     timeoutMs: z.number().min(1000).max(600000).default(60000),

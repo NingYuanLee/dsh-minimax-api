@@ -82,6 +82,8 @@ The legacy China host `api.minimaxi.com` still answers, but the current document
 
 On the official hosts the address and the protocol are paired: `/v1` speaks OpenAI-compatible, `/anthropic` speaks Anthropic-compatible. Changing the protocol in the settings page rewrites the path for you, and changing an access preset fills both. Custom endpoints are never rewritten.
 
+The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fresh install points at `https://api.minimax.cn/anthropic` — the China M Plan route on MiniMax's recommended protocol.
+
 **MiniMax recommends the Anthropic-compatible route** (the docs label it "recommended" and the SDK examples lead with it). It serves the same two models with the same bearer key, and it is the only route where the thinking depth travels as `output_config.effort`. Use `coding-global` / `coding-cn` if you want that default; both key types work there.
 
 ### M Plan quota
@@ -154,9 +156,9 @@ Use the plugin settings page for normal setup. Manual configuration in the profi
   name: dsh-minimax-byapi
   config:
     connection:
-      plan: payg-global
-      baseURL: https://api.minimax.io/v1
-      api: openai-completions
+      plan: coding-cn
+      baseURL: https://api.minimax.cn/anthropic
+      api: anthropic-messages
       apiKeyEnv: MINIMAX_API_KEY
       verify: true
       timeoutMs: 60000
@@ -170,11 +172,11 @@ Use the plugin settings page for normal setup. Manual configuration in the profi
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `connection.plan` | `payg-global` | Access mode: `payg-global`, `payg-cn`, `coding-global`, `coding-cn`, `custom`. Fills `baseURL` and `api`. |
-| `connection.baseURL` | `https://api.minimax.io/v1` | API address. Non-local addresses must be HTTPS; the path is normalized to `/v1` or `/anthropic`. |
+| `connection.plan` | `coding-cn` | Access mode: `payg-global`, `payg-cn`, `coding-global`, `coding-cn`, `custom`. Fills `baseURL` and `api`. The default is the China M Plan route on the recommended Anthropic-compatible protocol. |
+| `connection.baseURL` | `https://api.minimax.cn/anthropic` | API address. Non-local addresses must be HTTPS; the path is normalized to `/v1` or `/anthropic`. |
 | `connection.apiKey` | empty | Direct key override for local testing; takes precedence over the credential. Leave empty in normal use. |
 | `connection.apiKeyEnv` | `MINIMAX_API_KEY` | Credential reference name in the dsh credential service. |
-| `connection.api` | `openai-completions` | Chat protocol: `openai-completions`, `openai-responses` or `anthropic-messages`. |
+| `connection.api` | `anthropic-messages` | Chat protocol: `openai-completions`, `openai-responses` or `anthropic-messages`. |
 | `connection.verify` | `true` | Verify `GET {root}/v1/models` with the saved key when settings are saved. |
 | `connection.timeoutMs` | `60000` | Request timeout in milliseconds (1000–600000). |
 | `media.imageModel` | empty | Image model used when a call omits `model`. |
