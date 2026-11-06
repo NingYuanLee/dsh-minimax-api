@@ -6,7 +6,7 @@ Native MiniMax for DeepSeek Harness: chat with a subscription (M Plan) key or a 
 
 English | [中文](README.zh.md)
 
-> **Not published to npm yet.** Install from git or from a local checkout — see [Install](#install). The npm form of the command is kept in the snippet so it works unchanged once the package is published.
+> **Published on npm.** `dsh plugin add dsh-minimax-byapi` installs the released package; a git clone or a local checkout works too — see [Install](#install).
 
 One plugin, one MiniMax connection. Chat models appear in the model picker; image, video, speech and music models stay out of it and are used through tools instead. Any chat model — MiniMax or another provider — can call those tools. The plugin talks to the official MiniMax open platform, keeps the API key in the dsh credential service, and saves generated media locally. It is not an OAuth client, does not provide an account or quota, and does not read any MiniMax CLI token.
 
@@ -97,7 +97,14 @@ The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fr
 
 ## Install
 
-**From git (recommended until the package reaches npm):**
+**From npm (recommended):**
+
+```powershell
+dsh --profile minimax-test --from-default-profile web --dump-config
+dsh plugin --profile minimax-test add dsh-minimax-byapi
+```
+
+**From git:**
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
@@ -114,13 +121,6 @@ dsh --profile minimax-test --from-default-profile web --dump-config
 dsh plugin --profile minimax-test add "$PWD"   # bash/zsh: "$(pwd)"
 ```
 
-**From npm (once published):**
-
-```powershell
-dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add dsh-minimax-byapi
-```
-
 `--dump-config` creates the profile from your default profile and prints the merged configuration without starting a server. `dsh plugin add` records the bundle in that profile — no manual YAML edit. The package has no `prepare` or `postinstall` script, so installation runs no build code and needs no `allowBuilds` entry.
 
 Start dsh with that profile:
@@ -133,7 +133,7 @@ Keep the plugin in a dedicated profile until you are satisfied; this keeps the p
 
 ## Update and uninstall
 
-Updating a git install means removing it and adding the new commit; local installs update with `git pull` and `npm install --ignore-scripts`. Restart dsh afterwards.
+Updating a git install means removing it and adding the new commit; local installs update with `git pull` and `npm install --ignore-scripts`; an npm install picks up the new version when you remove and re-add the plugin. Restart dsh afterwards.
 
 ```powershell
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
@@ -267,7 +267,7 @@ Installation is successful when all four checks pass:
 
 | Symptom | Fix |
 | --- | --- |
-| `dsh plugin add` fails or reports 404 | Use the git or local-checkout form above; the package is not on npm yet. |
+| `dsh plugin add` fails or reports 404 | Use the git or local-checkout form above; that path does not depend on the npm registry. |
 | Plugin is listed but does not load | Your dsh is outside `>=0.2.1-rc.2 <0.3.0-0`. Upgrade to a 0.2.x build. |
 | 401 or 403 in settings | Wrong key or base URL. Re-save the key and check the address preset (`api.minimax.io` vs `api.minimaxi.com`). |
 | "该地址没有开放模型列表接口" | That address does not expose `GET /v1/models`; the self-check is skipped and the built-in model constants are used. |

@@ -17,8 +17,8 @@
 | 对话模型清单与退役列表 | 官方文档 | 📄 文档结论，未用真实 Key 实测 |
 | 生图 / 视频 / 语音 / 转写端点与参数 | 官方文档 | 📄 文档结论，未用真实 Key 实测 |
 | 音乐能力已退役、2026-08-20 起不向新用户开放 | 官方文档 | 📄 文档结论 |
-| 端到端对话与媒体生成（真实凭据） | — | ❌ 未验证 |
-| dsh `0.2.2-rc.1` 独立 Web profile 安装、加载与设置页渲染 | 本地实测 | ✅ 已实测（对话与媒体调用仍需真实凭据） |
+| 端到端对话（真实凭据，经 `minimax-byapi` 路由） | 本地实测 | ✅ 已实测（媒体生成仍未验证） |
+| dsh `0.2.2-rc.1` 独立 Web profile 安装、加载与设置页渲染 | 本地实测 | ✅ 已实测（媒体调用仍需真实凭据） |
 
 ## 一、本地实测
 
@@ -35,7 +35,9 @@ npm pack --dry-run --ignore-scripts
 - ✅ `npm run check` 通过（2026-11-05）。
 - ✅ `npm pack --dry-run --ignore-scripts` 的产物清单为：`CHANGELOG.md`、`LICENSE`、`README.md`、`README.zh.md`、`SECURITY.md`、`assets/media.svg`、`cordis.patch.yml`、`icon.svg`、`lib/client.js`、`locale/en.json`、`locale/media/en.json`、`locale/media/zh.json`、`locale/zh.json`、`package.json`、`scripts/build-client.mjs`、`src/*.js`。
   - `package.json` 的 `files` 白名单**不含 `docs/` 与 `test/`**：仓库里的 `docs/` 说明文档只在仓库站点可见，不随安装包分发。README 的「延伸阅读」链接指向仓库路径，不表示安装包内含 `docs/` 目录。
-- ✅ `npm test` 全绿（2026-11-05）：101 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/quota.test.js`（M Plan 额度归一化、www 主机映射、按量付费 Key 拒绝、自定义地址不发请求）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、13 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
+- ✅ `npm test` 全绿（2026-11-06）：107 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言，以及适配器作用域必须能应答宿主的请求头水位线这一条回归用例）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/quota.test.js`（M Plan 额度归一化、www 主机映射、按量付费 Key 拒绝、自定义地址不发请求）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、13 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线、声明的 peer 范围必须被安装树满足）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
+- ✅ 依赖树与宿主对齐（2026-11-06）：peer 范围放宽后，开发树解析到与宿主同一代依赖 —— `@deepseek-ai/dsh-llm-pi-ai` / `dsh-llm` / `dsh-credentials` / `dsh-tools` 均为 `0.2.2-rc.1`、`@deepseek-ai/cordis` `4.1.0`、`@deepseek-ai/schemastery` `3.19.0`，`npm ci` 可复现。因此仓库自带用例现在跑的就是宿主在跑的 pi-ai。
+  - 在这套依赖下，用 `git show HEAD:src/adapter.js` 与 `HEAD:test/adapter.test.js` 跑 `node --test test/adapter.test.js`：4 条用例中 3 条失败，报 `pi-ai request header preparation failed for provider "minimax-byapi"`（cause：`TypeError: ctx.waterfall is not a function`）；换成修复版后 8 条全过。即回归用例在仓库内即可复现该故障。
 - ✅ 独立 profile 实机安装（2026-11-05，宿主 dsh `0.2.2-rc.1`）：
   ```powershell
   dsh --profile minimax-test --from-default-profile web --dump-config
@@ -48,6 +50,10 @@ npm pack --dry-run --ignore-scripts
   - 该 profile 未配置真实 Key，因此模型选择器为空、对话与媒体请求未发起；这两项仍属未验证。
   - 参数改造后二次复验（同一天、同一 profile，`link:` 安装随源码更新）：插件详情页正常打开，两个组件仍为「运行中」，接入方式下拉 5 项（含「订阅 M Plan（国际/国内）」）、API 协议下拉 3 项，浏览器控制台无 error / warn。
   - 补齐音色查询与异步长文本语音后三次复验：详情页能力说明中已出现 `minimax_list_voices` 与 `minimax_speak_long`，两个组件仍为「运行中」，控制台无 error / warn。
+- ✅ 端到端对话实测（2026-11-06，宿主 dsh `0.2.2-rc.1`，桌面 profile 经 `link:` 安装本仓库）：
+  - 修复 `src/adapter.js` 的作用域缺失 `ctx.waterfall` 之后，在插件页禁用并重新启用「MiniMax ByAPI」，插件重新注册 `minimax-byapi` 路由，`/api/llm/listProviders` 与 `/api/session/modelCatalog` 中该路由与 `MiniMax-M3.1-Flash`、`MiniMax-M3` 均在列。
+  - 在模型选择器中选中该路由的 `MiniMax M3.1 Flash`（即插件自己注册的那一条，与宿主 `minimaxi` 路由的 `MiniMax-M3.1-Flash` 是两条不同路由），发送一条消息，模型正常回复，状态为「已完成，用时 14 秒」，用量 49.1K tok。真实凭据、真实端点、真实流式响应。
+  - 修复前同一路径必然失败，报 `pi-ai request header preparation failed for provider "minimax-byapi"`，底层原因是 `TypeError: ctx.waterfall is not a function`。该结论在 `dsh-llm-pi-ai@0.2.2-rc.1`（宿主实际版本）上用 HEAD 版 `src/adapter.js` 复现、用修复版复验，均为真实 HTTP 请求，非模拟。
 
 ### 已实测的行为要点
 
@@ -120,14 +126,15 @@ npm pack --dry-run --ignore-scripts
 
 ## 三、未验证与已知限制
 
-- ❌ **端到端真实调用**：尚未使用任何真实 MiniMax Key 跑通对话、生图、视频、语音、转写。因此上游限流、错误码到插件提示文案的映射都未实测。
-- ⚠️ **dsh 实机验收的范围**：已在 dsh `0.2.2-rc.1` 的独立 Web profile 完成安装、加载、组件状态与设置页渲染的实机验证；尚未验证模型选择器中实际出现 MiniMax 模型、保存密钥后的凭据回写、以及媒体文件在会话中的播放（这些都需要真实 Key）。
+- ✅ **端到端真实调用（对话）**：已用真实 MiniMax Key 经 `minimax-byapi` 路由跑通一轮对话（2026-11-06，见上）。生图、视频、语音、转写仍未用真实 Key 跑通，因此上游限流、以及错误码到插件提示文案的映射在媒体路径上仍未实测。
+- ⚠️ **dsh 实机验收的范围**：已在 dsh `0.2.2-rc.1` 的独立 Web profile 完成安装、加载、组件状态与设置页渲染的实机验证；在桌面 profile 用真实凭据验证了模型选择器中实际出现 MiniMax 模型、对话请求可正常完成。仍未验证保存密钥后的凭据回写、以及媒体文件在会话中的播放（这些都需要真实 Key）。
 - ❌ **M Plan 档位差异**：未验证各订阅档位可调用的模型范围（尤其 H3 视频）。
 - ❌ **ASR 实测**：`asr-1.0` 的转写只做了接口与字段层面的文档核对，未跑真实音频。
 - ❌ **音色查询与异步长文本语音实测**：`/v1/get_voice` 与 `t2a_async_v2` 全链路只用本地桩服务验证了请求与状态机，未用真实账号跑过；真实音色列表内容与 9 小时下载窗口未验证。
 - ❌ **M Plan 额度实测**：`/v1/token_plan/remains` 的字段语义依赖社区记录（官方未公开字段表），尚未用真实订阅 Key 核对真实返回；`current_*_usage_count` 到底按剩余还是已用，需要在有订阅 Key 的账号上确认一次。
 - ❌ **音乐实测**：新账号必然失败（上游已对新用户关闭）；存量付费账号能否调用未验证。
-- ❌ **npm 发布与市场收录**：包尚未发布到 npm，安装方式为 git 或本地目录；`awesome-dsh-plugin` 等市场收录未做。
+- ✅ **npm 发布**：包已发布到 npm（`dsh-minimax-byapi`），`latest` 指向首次发布的版本；安装方式为 npm、git 或本地目录。
+- ❌ **市场收录**：`awesome-dsh-plugin` 等社区列表尚未收录。
 - ⚠️ **速率限制**：官方给出 LLM 200 RPM / 10M TPM、生图 10 RPM、视频 V1 20 RPM、V2 300 RPM（最多 30 个在飞任务）、TTS 60 RPM 等限制，插件不做本地限流，完全依赖上游。
 - ⚠️ **媒体任务并发**：任务按会话隔离并持久化，但没有实现多 Host 进程共用同一数据目录时的跨进程锁。
 - ⚠️ **模型分类**：分类基于内置规则与关键字，不是上游保证；历史模型或研究类模型未必适合当 Agent 工具使用。

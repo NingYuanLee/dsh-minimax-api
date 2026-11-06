@@ -6,7 +6,7 @@
 
 [English](README.md) | 中文
 
-> **尚未发布到 npm。** 请先用 git 或本地目录安装 —— 见[安装](#安装)。安装命令里的 npm 写法一并保留，发布后可直接照用。
+> **已发布到 npm。** `dsh plugin add dsh-minimax-byapi` 安装已发布的包；git clone 或本地目录同样可用 —— 见[安装](#安装)。
 
 一个插件，一条 MiniMax 连接。对话模型出现在模型选择器里；图片、视频、语音、音乐模型不进入选择器，而是通过工具调用。任何对话模型 —— MiniMax 或其他厂商 —— 都能调用这些工具。插件只访问 MiniMax 官方开放平台，把 API Key 存在 dsh 凭据服务里，生成的媒体保存在本地。它不是 OAuth 客户端，不提供账号与配额，也不读取任何 MiniMax 命令行令牌。
 
@@ -97,7 +97,14 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 
 ## 安装
 
-**从 git 安装（发布到 npm 前的推荐方式）：**
+**从 npm 安装（推荐）：**
+
+```powershell
+dsh --profile minimax-test --from-default-profile web --dump-config
+dsh plugin --profile minimax-test add dsh-minimax-byapi
+```
+
+**从 git 安装：**
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
@@ -114,13 +121,6 @@ dsh --profile minimax-test --from-default-profile web --dump-config
 dsh plugin --profile minimax-test add "$PWD"   # bash/zsh: "$(pwd)"
 ```
 
-**从 npm 安装（发布之后）：**
-
-```powershell
-dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add dsh-minimax-byapi
-```
-
 `--dump-config` 会基于默认 profile 创建新 profile 并打印合并后的配置，不会启动服务。`dsh plugin add` 会把该 bundle 记录到 profile 里，不需要手改 YAML。本包没有 `prepare` 或 `postinstall` 脚本，安装过程不执行任何构建代码，也不需要 `allowBuilds` 条目。
 
 用该 profile 启动 dsh：
@@ -133,7 +133,7 @@ dsh --profile minimax-test --no-open
 
 ## 更新与卸载
 
-git 安装的更新方式是先移除再添加新提交；本地目录安装用 `git pull` 加 `npm install --ignore-scripts`。之后重启 dsh。
+git 安装的更新方式是先移除再添加新提交；本地目录安装用 `git pull` 加 `npm install --ignore-scripts`；npm 安装在移除并重新添加插件后取到新版本。之后重启 dsh。
 
 ```powershell
 dsh plugin --profile minimax-test remove dsh-minimax-byapi
@@ -267,7 +267,7 @@ MiniMax 已退役音乐模型，并且自 **2026-08-20** 起音乐 API 不再向
 
 | 现象 | 处理 |
 | --- | --- |
-| `dsh plugin add` 失败或报 404 | 改用上面的 git 或本地目录方式；包还没有发布到 npm。 |
+| `dsh plugin add` 失败或报 404 | 改用上面的 git 或本地目录方式；这条路不依赖 npm registry。 |
 | 插件已列出但加载不了 | 你的 dsh 不在 `>=0.2.1-rc.2 <0.3.0-0` 区间，升级到 0.2.x 版本。 |
 | 设置页报 401 或 403 | Key 或地址不对。重新保存 Key，并核对预设地址（`api.minimax.io` 还是 `api.minimaxi.com`）。 |
 | 提示「该地址没有开放模型列表接口」 | 该地址没有开放 `GET /v1/models`，自检会被跳过，改用内置模型常量。 |
