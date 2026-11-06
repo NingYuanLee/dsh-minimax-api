@@ -2,6 +2,13 @@
 
 All notable changes to `dsh-minimax-byapi` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+## 0.1.2
+
+### Changed
+- Unify the README badge row (CI, npm, MIT license, Node, DSH range, `dsh-plugin` topic, powered by dsh) so the badge states the same range as `engines.dsh`.
+
 ## 0.1.1
 
 ### Fixed
