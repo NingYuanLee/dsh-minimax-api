@@ -37,6 +37,7 @@ npm pack --dry-run --ignore-scripts
   - `package.json` 的 `files` 白名单**不含 `docs/` 与 `test/`**：仓库里的 `docs/` 说明文档只在仓库站点可见，不随安装包分发。README 的「延伸阅读」链接指向仓库路径，不表示安装包内含 `docs/` 目录。
 - ✅ `npm test` 全绿（2026-11-06）：107 项用例全部通过。其中 `test/catalog.test.js`（模型分类、覆盖项、地址规整 `normalizeBaseURL` 与 `apiRootOf`）、`test/adapter.test.js`（对话适配器，含三条通道的请求体断言，以及适配器作用域必须能应答宿主的请求头水位线这一条回归用例）、`test/media.test.js`（媒体任务、hex 音频解码、视频 v1/v2 三步流程、音色查询、异步长文本语音全链路）、`test/quota.test.js`（M Plan 额度归一化、www 主机映射、按量付费 Key 拒绝、自定义地址不发请求）、`test/lock.test.js`（文件锁）、`test/inline-key.test.js`（直填密钥与凭据引用的优先级）、`test/client-i18n.test.js` 与 `test/client-settings.test.js`（前端文案与设置页、13 个工具卡片）、`test/package-meta.test.js`（发布清单与 `engines` 基线、声明的 peer 范围必须被安装树满足）。测试只连 `127.0.0.1` 的桩服务，不访问真实接口。
 - ✅ 依赖树与宿主对齐（2026-11-06）：peer 范围放宽后，开发树解析到与宿主同一代依赖 —— `@deepseek-ai/dsh-llm-pi-ai` / `dsh-llm` / `dsh-credentials` / `dsh-tools` 均为 `0.2.2-rc.1`、`@deepseek-ai/cordis` `4.1.0`、`@deepseek-ai/schemastery` `3.19.0`，`npm ci` 可复现。因此仓库自带用例现在跑的就是宿主在跑的 pi-ai。
+- ✅ `engines.dsh` 覆盖实测宿主（2026-11-06）：原范围 `>=0.2.1-rc.2 <0.3.0-0` 按 semver 不接受 `0.2.2-rc.1`（预发布元组规则，与 peer 范围同一套问题），已改为联合式 `>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0`；该范围由市场索引展示给用户，因此必须与实测宿主一致。
   - 在这套依赖下，用 `git show HEAD:src/adapter.js` 与 `HEAD:test/adapter.test.js` 跑 `node --test test/adapter.test.js`：4 条用例中 3 条失败，报 `pi-ai request header preparation failed for provider "minimax-byapi"`（cause：`TypeError: ctx.waterfall is not a function`）；换成修复版后 8 条全过。即回归用例在仓库内即可复现该故障。
 - ✅ 独立 profile 实机安装（2026-11-05，宿主 dsh `0.2.2-rc.1`）：
   ```powershell

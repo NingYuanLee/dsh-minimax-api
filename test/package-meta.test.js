@@ -67,7 +67,7 @@ test('the bundle patch points at real package specifiers', async () => {
 test('the manifest follows the unified dsh baseline', async () => {
   const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   assert.equal(manifest.dsh.manifestVersion, 1);
-  assert.equal(manifest.engines.dsh, '>=0.2.1-rc.2 <0.3.0-0');
+  assert.equal(manifest.engines.dsh, '>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0');
   assert.equal(manifest.engines.node, '>=22.19.0');
   // The 0.2.x dsh line ships prereleases (0.2.2-rc.1 and later). npm only lets a
   // prerelease satisfy a range whose comparators mention that same

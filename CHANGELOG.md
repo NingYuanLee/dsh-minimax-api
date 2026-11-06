@@ -2,6 +2,12 @@
 
 All notable changes to `dsh-minimax-byapi` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.1
+
+### Fixed
+
+- **The declared host range excluded the host the plugin is verified on.** `engines.dsh` was `>=0.2.1-rc.2 <0.3.0-0`, which — by the same prerelease rule that affected the peer ranges — does not admit `0.2.2-rc.1`, the dsh build this plugin is developed and verified against. The range now covers both prerelease tuples: `>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0`. The Discover index publishes this range to users, so it has to name the hosts the plugin actually runs on.
+
 ## 0.1.0
 
 First release. The plugin is renamed and reworked from the previous Grok gateway plugin to talk to the official MiniMax open platform, then corrected against the official API reference (`platform.minimax.cn/docs/api-reference`).

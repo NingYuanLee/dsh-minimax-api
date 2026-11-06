@@ -45,9 +45,9 @@ Not provided: realtime voice conversation (audio-in / audio-out), voice cloning,
 
 | Component | Requirement | Verified |
 | --- | --- | --- |
-| dsh | `>=0.2.1-rc.2 <0.3.0-0` via `engines.dsh` | `0.2.2-rc.1` in an isolated Web profile: install, load, both components running, settings page rendered. Chat and media calls still need a real key — see [VALIDATION.md](VALIDATION.md) |
+| dsh | `>=0.2.1-rc.2 <0.3.0-0 \|\| >=0.2.2-0 <0.3.0-0` via `engines.dsh` | `0.2.2-rc.1` in an isolated Web profile: install, load, both components running, settings page rendered. Chat and media calls still need a real key — see [VALIDATION.md](VALIDATION.md) |
 | Node.js | `>=22.19.0` | CI runs Node 22.19 and 24 on Linux and Windows |
-| MiniMax | Official open platform, international (`api.minimax.io`) or China (`api.minimaxi.com` / `api.minimax.cn`) | Documented endpoints only; no live call with a real key yet |
+| MiniMax | Official open platform, international (`api.minimax.io`) or China (`api.minimaxi.com` / `api.minimax.cn`) | Chat verified live with a real key on the China M Plan route; the media endpoints are documented only — see [VALIDATION.md](VALIDATION.md) |
 | Other dsh 0.2.x | Inside the `engines.dsh` range | Not individually verified |
 
 `engines.dsh` is the compatibility gate; `peerDependencies` pin the SDK packages the source uses but do not decide compatibility, so rerun the integration tests after a dsh upgrade.
@@ -268,7 +268,7 @@ Installation is successful when all four checks pass:
 | Symptom | Fix |
 | --- | --- |
 | `dsh plugin add` fails or reports 404 | Use the git or local-checkout form above; that path does not depend on the npm registry. |
-| Plugin is listed but does not load | Your dsh is outside `>=0.2.1-rc.2 <0.3.0-0`. Upgrade to a 0.2.x build. |
+| Plugin is listed but does not load | Your dsh is outside `>=0.2.1-rc.2 <0.3.0-0 \|\| >=0.2.2-0 <0.3.0-0`. Upgrade to a 0.2.x build. |
 | 401 or 403 in settings | Wrong key or base URL. Re-save the key and check the address preset (`api.minimax.io` vs `api.minimaxi.com`). |
 | "该地址没有开放模型列表接口" | That address does not expose `GET /v1/models`; the self-check is skipped and the built-in model constants are used. |
 | Connection refused or timeout | The endpoint is unreachable, or the account has no balance left. `timeoutMs` caps each request. |
