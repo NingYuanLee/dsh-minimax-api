@@ -290,7 +290,35 @@ npm run build        # rebuilds lib/client.js from src/client.js
 npm pack --dry-run
 ```
 
-CI (`.github/workflows/ci.yml`) runs on Linux and Windows with Node 22.19 and 24: install, tests, syntax checks, build, a check that `lib/client.js` matches the build output, and a pack dry run. Pushing a `v*` tag runs `.github/workflows/release.yml`, which verifies that the tag matches `package.json`, repeats the checks, attaches the packed tarball to a GitHub Release, and publishes to npm only if an `NPM_TOKEN` secret is configured.
+CI (`.github/workflows/ci.yml`) runs on Linux and Windows with Node 22.19 and 24: install, tests, syntax checks, build, a check that `lib/client.js` matches the build output, and a pack dry run. Pushing a `v*` tag runs `.github/workflows/release.yml`, which verifies that the tag matches `package.json`, repeats the checks, attaches the packed tarball to a GitHub Release, and publishes to npm through trusted publishing (OIDC) — the workflow stores no npm token and lets GitHub mint a short-lived OIDC token instead.
+
+Trusted publishing has to be registered for the package once. With npm CLI 11.16 or newer the registration can be done from the command line (an npm login is required first):
+
+```bash
+npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+```
+
+`--file` takes the workflow file name only, `--repo` the `owner/repo` pair, and `--allow-publish` lets this trusted publisher run `npm publish` (`npm stage publish` is always allowed). The same registration can be made on npmjs.com under **Packages → `dsh-minimax-byapi` → Settings → Trusted publishing**:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `NingYuanLee` |
+| Repository | `dsh-minimax-byapi` |
+| Workflow filename | `release.yml` |
+| Environment name | leave empty |
+
+The workflow filename is the file name only — `release.yml`, matching `.github/workflows/release.yml` exactly, including case.
+
+### Publishing from a local checkout
+
+npm revoked every classic token, and a granular access token can no longer publish a new version directly, so a local release goes through the two-hour session token that `npm login --auth-type=web` sets up:
+
+```bash
+npm login --auth-type=web   # open the printed URL and finish WebAuthn / TOTP in the browser
+npm publish --otp <code>    # <code> is the 6-digit one-time passcode from your authenticator
+```
+
+The one-time passcode is required at publish time; `npm publish` asks for it interactively when `--otp` is omitted. Keep tokens and passcodes out of the repository, out of logs and out of commit messages.
 
 Further reading: [docs/connection-and-keys.md](docs/connection-and-keys.md) for the access modes, key types and model status; [docs/media-workflow.md](docs/media-workflow.md) for the media task lifecycle; [docs/minimax-api-notes.md](docs/minimax-api-notes.md) for the upstream API research this plugin is built on. These pages live in the repository only — `docs/` is not part of the published package.
 

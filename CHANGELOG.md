@@ -4,6 +4,9 @@ All notable changes to `dsh-minimax-byapi` are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+- The release workflow now publishes to npm through [trusted publishing (OIDC)](https://docs.npmjs.com/trusted-publishers) instead of a repository npm secret: the workflow holds no npm token and asks GitHub for a short-lived OIDC token through `id-token: write`. The trusted publisher is registered once per package, on npmjs.com (organization or user `NingYuanLee`, repository `dsh-minimax-byapi`, workflow filename `release.yml`, environment empty) or with `npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish`, and a local release now goes through `npm login --auth-type=web` (two-hour session token) plus `npm publish --otp <code>`.
+
 ## 0.1.2
 
 ### Changed

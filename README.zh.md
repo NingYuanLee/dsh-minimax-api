@@ -290,7 +290,35 @@ npm run build        # 由 src/client.js 重新构建 lib/client.js
 npm pack --dry-run
 ```
 
-CI（`.github/workflows/ci.yml`）在 Linux 与 Windows 上以 Node 22.19 与 24 运行：安装依赖、测试、语法检查、构建、校验 `lib/client.js` 与构建产物一致、以及打包试运行。推送 `v*` 标签会触发 `.github/workflows/release.yml`：校验标签与 `package.json` 版本一致、重复上述检查、把打包产物挂到 GitHub Release，并在配置了 `NPM_TOKEN` secret 时才发布到 npm。
+CI（`.github/workflows/ci.yml`）在 Linux 与 Windows 上以 Node 22.19 与 24 运行：安装依赖、测试、语法检查、构建、校验 `lib/client.js` 与构建产物一致、以及打包试运行。推送 `v*` 标签会触发 `.github/workflows/release.yml`：校验标签与 `package.json` 版本一致、重复上述检查、把打包产物挂到 GitHub Release，并通过 trusted publishing（OIDC）发布到 npm —— workflow 里不存放任何 npm 令牌，由 GitHub 现场签发短时 OIDC 令牌。
+
+trusted publishing 需要为该包登记一次。用 npm CLI 11.16 及以上版本可以直接在命令行登记（需先登录 npm）：
+
+```bash
+npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+```
+
+`--file` 只写 workflow 文件名，`--repo` 写 `owner/repo`，`--allow-publish` 表示允许该 trusted publisher 执行 `npm publish`（`npm stage publish` 始终允许）。也可以在 npmjs.com 网页上登记：**Packages → `dsh-minimax-byapi` → Settings → Trusted publishing**
+
+| 字段 | 填写内容 |
+| --- | --- |
+| Organization or user | `NingYuanLee` |
+| Repository | `dsh-minimax-byapi` |
+| Workflow filename | `release.yml` |
+| Environment name | 留空 |
+
+Workflow filename 只写文件名 —— `release.yml`，要与 `.github/workflows/release.yml` 完全一致，大小写也必须相同。
+
+### 本地手动发布
+
+npm 已吊销全部 classic token，granular access token 也不能直接发布新版本，因此本地发布走 `npm login --auth-type=web` 建立的两小时会话令牌：
+
+```bash
+npm login --auth-type=web   # 打开命令打印出来的链接，在浏览器里完成 WebAuthn / TOTP
+npm publish --otp <code>    # <code> 是验证器里的 6 位一次性验证码
+```
+
+发布时必须完成 2FA 一次性验证码授权；不带 `--otp` 时 `npm publish` 会在命令行里交互提问。令牌与验证码不要写进仓库、日志或提交信息。
 
 延伸阅读：[docs/connection-and-keys.md](docs/connection-and-keys.md) 讲接入方式、两类 Key 与模型状态；[docs/media-workflow.md](docs/media-workflow.md) 讲媒体任务生命周期；[docs/minimax-api-notes.md](docs/minimax-api-notes.md) 是本插件所依据的上游 API 调研笔记。这些页面只存在于仓库中 —— `docs/` 不在发布包的 `files` 白名单里。
 
