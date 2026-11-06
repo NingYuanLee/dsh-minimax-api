@@ -69,10 +69,35 @@ test('the manifest follows the unified dsh baseline', async () => {
   assert.equal(manifest.dsh.manifestVersion, 1);
   assert.equal(manifest.engines.dsh, '>=0.2.1-rc.2 <0.3.0-0');
   assert.equal(manifest.engines.node, '>=22.19.0');
-  for (const name of ['@deepseek-ai/dsh-credentials', '@deepseek-ai/dsh-llm-pi-ai', '@deepseek-ai/dsh-tools']) {
-    assert.equal(manifest.peerDependencies[name], '>=0.2.1-0 <0.3.0', name);
+  // The 0.2.x dsh line ships prereleases (0.2.2-rc.1 and later). npm only lets a
+  // prerelease satisfy a range whose comparators mention that same
+  // [major, minor, patch] tuple, so `>=0.2.1-0 <0.3.0` alone would reject the
+  // very versions the host runs. The union form is what the sibling plugins
+  // declare; the second clause unlocks the 0.2.2 prerelease line.
+  const baseline = {
+    '@deepseek-ai/cordis': '>=4.0.4 <5.0.0',
+    '@deepseek-ai/schemastery': '>=3.18.4 <4.0.0',
+    '@deepseek-ai/dsh-credentials': '>=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0',
+    '@deepseek-ai/dsh-llm-pi-ai': '>=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0',
+    '@deepseek-ai/dsh-tools': '>=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0',
+  };
+  for (const [name, range] of Object.entries(baseline)) {
+    assert.equal(manifest.peerDependencies[name], range, name);
   }
+  assert.equal(manifest.devDependencies['@deepseek-ai/dsh-llm'], '>=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0');
   await assert.rejects(access(resolve(root, 'market/index.json')), { code: 'ENOENT' });
+});
+
+test('the installed tree satisfies the declared peer ranges', async () => {
+  // npm reports an unmet peer as "invalid" and exits non-zero. The 0.2.x
+  // prerelease line is the case that silently breaks: the plugin still loads,
+  // but the route it registers is unusable.
+  const peers = ['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-credentials', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-llm-pi-ai'];
+  const result = await run(`npm ls ${peers.join(' ')}`, { cwd: root }).catch(error => error);
+  // A resolved exec carries no exit code; a rejected one carries the code.
+  const code = result.code ?? 0;
+  assert.equal(code, 0, `npm ls reported an unmet peer range:\n${result.stdout}\n${result.stderr}`);
+  assert.doesNotMatch(result.stdout + result.stderr, /invalid/i);
 });
 
 test('npm pack ships every runtime and display resource and nothing private', async () => {

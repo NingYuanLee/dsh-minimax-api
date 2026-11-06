@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { LlmAdapter, createUserMessage, createAssistantMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm';
-import { buildChatAdapter } from '../src/adapter.js';
+import { buildChatAdapter, createAdapterScope } from '../src/adapter.js';
 
 test('official adapter preserves tool call roundtrip and credential reference', async t => {
   const requests = [];
@@ -140,4 +140,45 @@ test('Responses 不带 Chat Completions 的兼容字段，否则模型列表是�
   assert.deepEqual(await dropped.listModels('minimax-byapi'), []);
   const kept = buildChatAdapter(ctx, { api: 'openai-responses', baseURL: 'http://127.0.0.1:8317/v1', apiKeyEnv: 'TEST_MINIMAX_KEY', models, compat: {} });
   assert.deepEqual((await kept.listModels('minimax-byapi')).map(model => model.id), ['MiniMax-M3.1-Flash']);
+});
+
+test('作用域必须能应答宿主的请求头水位线，否则请求阶段才会失败', () => {
+  // 官方适配器在每次请求前都会走宿主的请求头接缝。作用域答不上来时，
+  // 请求会以「header preparation failed」告终，而不是在注册时暴露原因。
+  const calls = [];
+  const ctx = {
+    fiber: {}, logger: console, get: () => undefined,
+    waterfall: (name, ...args) => { calls.push({ name, args }); return args[args.length - 1](); },
+  };
+  const scope = createAdapterScope(ctx, () => {});
+  const headers = new Headers({ 'x-probe': 'yes' });
+  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-byapi' }, headers, () => headers);
+  assert.equal(calls.length, 1, '水位线必须交给宿主，而不是被作用域吞掉');
+  assert.equal(calls[0].name, 'llm-pi-ai/request-headers');
+  assert.equal(result.get('x-probe'), 'yes');
+});
+
+test('宿主没有请求头水位线时，作用域仍要返回交给它的标头', () => {
+  const scope = createAdapterScope({ fiber: {}, logger: console, get: () => undefined }, () => {});
+  const headers = new Headers({ 'x-probe': 'yes' });
+  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-byapi' }, headers, () => headers);
+  assert.equal(result, headers);
+});
+
+test('作用域要把未声明的宿主成员转发出去，官方适配器新增的接缝才不会再次失效', () => {
+  const ctx = { fiber: {}, logger: console, get: () => undefined, futureSeam: value => 'seam:' + value };
+  const scope = createAdapterScope(ctx, () => {});
+  assert.equal(scope.futureSeam('x'), 'seam:x');
+});
+
+test('注册入口保持隔离：官方适配器注册的路由被捕获，宿主的适配器与设置不被改动', () => {
+  let captured;
+  const scope = createAdapterScope({ fiber: {}, logger: console, get: () => undefined }, value => { captured = value; });
+  const disposer = scope.llm.registerAdapter(['minimax-byapi'], { id: 'captured' });
+  assert.equal(captured.id, 'captured');
+  assert.equal(typeof disposer, 'function');
+  assert.equal(typeof scope.llm.registerConfigurableProviders().replace, 'function');
+  assert.equal(typeof scope.llm.registerModelDiscovery(), 'function');
+  assert.equal(scope.inject('anything'), undefined);
+  assert.equal(typeof scope.on('anything', () => {}), 'function');
 });
