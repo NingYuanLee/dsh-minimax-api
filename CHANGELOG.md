@@ -2,6 +2,11 @@
 
 All notable changes to `dsh-minimax-api` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.1
+
+### Changed
+- **Repository links follow the GitHub rename.** The GitHub repository is now `NingYuanLee/dsh-minimax-api`, and `repository`, `homepage` and `bugs` in the npm metadata, the CI badge, the git install and clone commands, and the Issues/Repository links all point at it. The trusted publisher is registered for this repository, so pushing a `v*` tag publishes the package from CI through OIDC.
+
 ## 0.2.0
 
 ### Added
