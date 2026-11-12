@@ -45,11 +45,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NingYuanLee/dsh-minimax-byapi.git"
+    "url": "git+https://github.com/NingYuanLee/dsh-minimax-api.git"
   },
-  "homepage": "https://github.com/NingYuanLee/dsh-minimax-byapi#readme",
+  "homepage": "https://github.com/NingYuanLee/dsh-minimax-api#readme",
   "bugs": {
-    "url": "https://github.com/NingYuanLee/dsh-minimax-byapi/issues"
+    "url": "https://github.com/NingYuanLee/dsh-minimax-api/issues"
   },
   "keywords": [
     "dsh-plugin",

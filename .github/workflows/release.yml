@@ -73,5 +73,5 @@ jobs:
         # The same registration from the CLI (npm CLI >= 11.16, npm login
         # required):
         #   npm trust github dsh-minimax-api --file release.yml \
-        #     --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+        #     --repo NingYuanLee/dsh-minimax-api --allow-publish
         run: npm publish

@@ -2,7 +2,7 @@
 
 Native MiniMax for DeepSeek Harness: chat with a subscription (M Plan) key or a pay-as-you-go API key, image, video, speech and speech-to-text tools on the official MiniMax API, and a MiniMax usage row in the sidebar.
 
-[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#compatibility) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#compatibility) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+[![CI](https://github.com/NingYuanLee/dsh-minimax-api/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-api/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#compatibility) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#compatibility) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 English | [中文](README.zh.md)
 
@@ -117,14 +117,14 @@ dsh plugin --profile minimax-test add dsh-minimax-api
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add "git+https://github.com/NingYuanLee/dsh-minimax-byapi.git"
+dsh plugin --profile minimax-test add "git+https://github.com/NingYuanLee/dsh-minimax-api.git"
 ```
 
 **From a local checkout (development):**
 
 ```powershell
-git clone https://github.com/NingYuanLee/dsh-minimax-byapi.git
-cd dsh-minimax-byapi
+git clone https://github.com/NingYuanLee/dsh-minimax-api.git
+cd dsh-minimax-api
 npm install --ignore-scripts
 dsh --profile minimax-test --from-default-profile web --dump-config
 dsh plugin --profile minimax-test add "$PWD"   # bash/zsh: "$(pwd)"
@@ -304,7 +304,7 @@ CI (`.github/workflows/ci.yml`) runs on Linux and Windows with Node 22.19 and 24
 Trusted publishing has to be registered for the package once. With npm CLI 11.16 or newer the registration can be done from the command line (an npm login is required first):
 
 ```bash
-npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-api --allow-publish
 ```
 
 `--file` takes the workflow file name only, `--repo` the `owner/repo` pair, and `--allow-publish` lets this trusted publisher run `npm publish` (`npm stage publish` is always allowed). The same registration can be made on npmjs.com under **Packages → `dsh-minimax-api` → Settings → Trusted publishing**:
@@ -312,7 +312,7 @@ npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minim
 | Field | Value |
 | --- | --- |
 | Organization or user | `NingYuanLee` |
-| Repository | `dsh-minimax-byapi` |
+| Repository | `dsh-minimax-api` |
 | Workflow filename | `release.yml` |
 | Environment name | leave empty |
 
@@ -333,7 +333,7 @@ Further reading: [docs/connection-and-keys.md](docs/connection-and-keys.md) for 
 
 ## Community, license and disclaimer
 
-- Bugs and feature requests: [Issues](https://github.com/NingYuanLee/dsh-minimax-byapi/issues) (bug report and feature request templates are provided).
+- Bugs and feature requests: [Issues](https://github.com/NingYuanLee/dsh-minimax-api/issues) (bug report and feature request templates are provided).
 - Security: [SECURITY.md](SECURITY.md) — please use GitHub's private vulnerability reporting.
 - License: [MIT](LICENSE). Copyright (c) 2026 NingYuanLee.
-- Repository: <https://github.com/NingYuanLee/dsh-minimax-byapi>. This is a community plugin project, not an official DeepSeek or MiniMax product. "API access" means the plugin reaches MiniMax through the official API with your own key; it does not implement every MiniMax product feature.
+- Repository: <https://github.com/NingYuanLee/dsh-minimax-api>. This is a community plugin project, not an official DeepSeek or MiniMax product. "API access" means the plugin reaches MiniMax through the official API with your own key; it does not implement every MiniMax product feature.

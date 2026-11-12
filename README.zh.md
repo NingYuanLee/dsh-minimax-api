@@ -2,7 +2,7 @@
 
 为 DeepSeek Harness 接入原生 MiniMax：既可以用订阅 Key（M Plan）也可以用按量付费 API Key 对话，还能通过官方 MiniMax API 使用生图、视频、语音与语音转文字工具，并在侧栏查看 M Plan 用量。
 
-[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#兼容性与限制) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#兼容性与限制) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+[![CI](https://github.com/NingYuanLee/dsh-minimax-api/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-api/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#兼容性与限制) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#兼容性与限制) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 [English](README.md) | 中文
 
@@ -117,14 +117,14 @@ dsh plugin --profile minimax-test add dsh-minimax-api
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add "git+https://github.com/NingYuanLee/dsh-minimax-byapi.git"
+dsh plugin --profile minimax-test add "git+https://github.com/NingYuanLee/dsh-minimax-api.git"
 ```
 
 **从本地目录安装（开发）：**
 
 ```powershell
-git clone https://github.com/NingYuanLee/dsh-minimax-byapi.git
-cd dsh-minimax-byapi
+git clone https://github.com/NingYuanLee/dsh-minimax-api.git
+cd dsh-minimax-api
 npm install --ignore-scripts
 dsh --profile minimax-test --from-default-profile web --dump-config
 dsh plugin --profile minimax-test add "$PWD"   # bash/zsh: "$(pwd)"
@@ -304,7 +304,7 @@ CI（`.github/workflows/ci.yml`）在 Linux 与 Windows 上以 Node 22.19 与 24
 trusted publishing 需要为该包登记一次。用 npm CLI 11.16 及以上版本可以直接在命令行登记（需先登录 npm）：
 
 ```bash
-npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-api --allow-publish
 ```
 
 `--file` 只写 workflow 文件名，`--repo` 写 `owner/repo`，`--allow-publish` 表示允许该 trusted publisher 执行 `npm publish`（`npm stage publish` 始终允许）。也可以在 npmjs.com 网页上登记：**Packages → `dsh-minimax-api` → Settings → Trusted publishing**
@@ -312,7 +312,7 @@ npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minim
 | 字段 | 填写内容 |
 | --- | --- |
 | Organization or user | `NingYuanLee` |
-| Repository | `dsh-minimax-byapi` |
+| Repository | `dsh-minimax-api` |
 | Workflow filename | `release.yml` |
 | Environment name | 留空 |
 
@@ -333,7 +333,7 @@ npm publish --otp <code>    # <code> 是验证器里的 6 位一次性验证码
 
 ## 社区、许可与免责声明
 
-- Bug 与功能请求：[Issues](https://github.com/NingYuanLee/dsh-minimax-byapi/issues)（仓库自带 bug 报告与功能请求模板）。
+- Bug 与功能请求：[Issues](https://github.com/NingYuanLee/dsh-minimax-api/issues)（仓库自带 bug 报告与功能请求模板）。
 - 安全问题：[SECURITY.md](SECURITY.md) —— 请使用 GitHub 私密漏洞报告。
 - 许可：[MIT](LICENSE)。版权所有 (c) 2026 NingYuanLee。
-- 仓库：<https://github.com/NingYuanLee/dsh-minimax-byapi>。这是社区插件项目，不是 DeepSeek 或 MiniMax 的官方产品。“API接入” 指插件通过官方 API 用你自己的 Key 访问 MiniMax，并不等于实现了 MiniMax 的全部产品能力。
+- 仓库：<https://github.com/NingYuanLee/dsh-minimax-api>。这是社区插件项目，不是 DeepSeek 或 MiniMax 的官方产品。“API接入” 指插件通过官方 API 用你自己的 Key 访问 MiniMax，并不等于实现了 MiniMax 的全部产品能力。
