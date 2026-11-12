@@ -36,7 +36,7 @@ function host(tools, discoveries, providers) {
     logger: { warn: () => {}, info: () => {} },
     on: () => () => {},
     get: () => undefined,
-    fiber: { entry: { options: { id: 'minimax-byapi' } } },
+    fiber: { entry: { options: { id: 'minimax-api' } } },
     plugin(Plugin, ...args) { return new Plugin(this, ...args); },
     reflect: { provide(name, value) { provided.set(name, value); } },
     provided,
@@ -56,7 +56,7 @@ async function mount(t, connection) {
   const snapshot = { connection: { plan: 'custom', baseURL, api: 'openai-completions', apiKeyEnv: 'MINIMAX_API_KEY', timeoutMs: 5000, verify: false, ...connection }, media: {} };
   const configProxy = { connection: { get: () => snapshot.connection }, media: { get: () => ({ dataDir: '' }) }, modelOverrides: { get: () => [] } };
   await apply(ctx, configProxy);
-  return { tools, seen, discoveries, providers, baseURL, runtime: ctx.provided.get('minimax-byapi')?.runtime };
+  return { tools, seen, discoveries, providers, baseURL, runtime: ctx.provided.get('minimax-api')?.runtime };
 }
 
 test('明文 apiKey 优先于凭据引用，并按真实密钥请求', async t => {
@@ -73,13 +73,13 @@ test('明文 apiKey 优先于凭据引用，并按真实密钥请求', async t =
 test('安装后向模型页声明 MiniMax 提供商', async t => {
   const { providers } = await mount(t, { apiKey: GOOD });
   assert.deepEqual(providers, [{
-    provider: 'minimax-byapi', displayName: 'MiniMax', settingsNs: 'minimax-byapi', settingsPath: [], declared: false,
+    provider: 'minimax-api', displayName: 'MiniMax', settingsNs: 'minimax-api', settingsPath: [], declared: false,
   }]);
 });
 
 test('设置页发现使用草稿地址和一次性密钥，不改用已存凭据', async t => {
   const { discoveries, baseURL, seen, runtime } = await mount(t, { apiKey: BAD });
-  const discover = discoveries.get('minimax-byapi');
+  const discover = discoveries.get('minimax-api');
   assert.equal(typeof discover, 'function');
   // 后台首轮发现会用已保存的凭据请求一次 /models；等它落定再取基线，免得把它的请求算进本次发现。
   await runtime.ready;
@@ -111,7 +111,7 @@ test('留空 apiKey 时回退到凭据引用', async t => {
   };
   await apply(ctx, { connection: { get: () => ({ plan: 'custom', baseURL, api: 'openai-completions', apiKeyEnv: 'MINIMAX_API_KEY', timeoutMs: 5000, verify: false }) }, media: { get: () => ({ dataDir: '' }) }, modelOverrides: { get: () => [] } });
   // 激活不再等待首轮发现：显式等它落定，再断言回退用的是凭据里的密钥。
-  await provided.get('minimax-byapi').runtime.ready;
+  await provided.get('minimax-api').runtime.ready;
   assert.ok(seen.includes('Bearer ' + BAD), '应回退到凭据值：' + JSON.stringify(seen));
 });
 
@@ -137,7 +137,7 @@ test('首轮发现不阻塞激活：apply 先返回，ready 落定后才填清�
     on: () => () => {}, get: () => undefined, fiber: {}, reflect: { provide(name, value) { provided.set(name, value); } },
   };
   await apply(ctx, { connection: { get: () => ({ plan: 'custom', baseURL, api: 'openai-completions', apiKeyEnv: 'MINIMAX_API_KEY', timeoutMs: 5000, verify: false }) }, media: { get: () => ({ dataDir: '' }) }, modelOverrides: { get: () => [] } });
-  const runtime = provided.get('minimax-byapi').runtime;
+  const runtime = provided.get('minimax-api').runtime;
   assert.ok(runtime, '激活后应能拿到运行时');
   assert.equal(runtime.catalog().length, 0, 'apply 返回时首轮发现应仍在后台进行');
   release();

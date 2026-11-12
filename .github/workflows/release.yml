@@ -52,17 +52,17 @@ jobs:
           RELEASE_TAG="v$VERSION"
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
             gh release create "$RELEASE_TAG" \
-              --title "dsh-minimax-byapi $RELEASE_TAG" \
+              --title "dsh-minimax-api $RELEASE_TAG" \
               --generate-notes \
               "${FLAGS[@]}"
-          gh release upload "$RELEASE_TAG" "dsh-minimax-byapi-$VERSION.tgz" --clobber
+          gh release upload "$RELEASE_TAG" "dsh-minimax-api-$VERSION.tgz" --clobber
       - name: Publish to npm
         # Trusted publishing (OIDC): the npm CLI picks up the OIDC token that
         # GitHub mints for this workflow and exchanges it for a publish token.
         # No npm token is stored in the repository.
         #
         # Prerequisite (register once per package on npmjs.com,
-        # Packages -> dsh-minimax-byapi -> Settings -> Trusted publishing):
+        # Packages -> dsh-minimax-api -> Settings -> Trusted publishing):
         #   Organization or user: NingYuanLee
         #   Repository:           dsh-minimax-byapi
         #   Workflow filename:    release.yml   (file name only, matching
@@ -72,6 +72,6 @@ jobs:
         #
         # The same registration from the CLI (npm CLI >= 11.16, npm login
         # required):
-        #   npm trust github dsh-minimax-byapi --file release.yml \
+        #   npm trust github dsh-minimax-api --file release.yml \
         #     --repo NingYuanLee/dsh-minimax-byapi --allow-publish
         run: npm publish

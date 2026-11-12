@@ -4,7 +4,7 @@ import { Service } from '@deepseek-ai/cordis';
 // 所以生图、视频、语音和音乐工具不绑死在 MiniMax 聊天模型上。
 export class MinimaxRuntime extends Service {
   constructor(ctx, runtime) {
-    super(ctx, 'minimax-byapi');
+    super(ctx, 'minimax-api');
     this.runtime = runtime;
   }
 }

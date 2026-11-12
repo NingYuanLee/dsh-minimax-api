@@ -1,27 +1,29 @@
-# dsh-minimax-byapi
+# dsh-minimax-api
 
-Native MiniMax for DeepSeek Harness: chat with a subscription (M Plan) key or a pay-as-you-go API key, plus image, video, speech, speech-to-text and music tools over the official MiniMax API.
+Native MiniMax for DeepSeek Harness: chat with a subscription (M Plan) key or a pay-as-you-go API key, image, video, speech and speech-to-text tools on the official MiniMax API, and a MiniMax usage row in the sidebar.
 
-[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-byapi.svg)](https://www.npmjs.com/package/dsh-minimax-byapi) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#compatibility) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#compatibility) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#compatibility) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#compatibility) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 English | [中文](README.zh.md)
 
-> **Published on npm.** `dsh plugin add dsh-minimax-byapi` installs the released package; a git clone or a local checkout works too — see [Install](#install).
+> **Published on npm.** `dsh plugin add dsh-minimax-api` installs the released package; a git clone or a local checkout works too — see [Install](#install).
 
-One plugin, one MiniMax connection. Chat models appear in the model picker; image, video, speech and music models stay out of it and are used through tools instead. Any chat model — MiniMax or another provider — can call those tools. The plugin talks to the official MiniMax open platform, keeps the API key in the dsh credential service, and saves generated media locally. It is not an OAuth client, does not provide an account or quota, and does not read any MiniMax CLI token.
+One plugin, one MiniMax connection. Chat models appear in the model picker; image, video, speech and music models stay out of it and are used through tools instead. Any chat model — MiniMax or another provider — can call those tools. The plugin talks to the official MiniMax open platform, keeps the API key in the dsh credential service, and saves generated media locally. A MiniMax row at the foot of the sidebar shows how much of the 5-hour and weekly M Plan limits you have used, and the `MiniMax API` settings tab edits the connection, the language models and the media models in one place. It is not an OAuth client, does not issue credentials or grant quota, and does not read any MiniMax CLI token.
 
 ## Features
 
 | Area | Current scope |
 | --- | --- |
-| Chat provider | Registers a native dsh LLM provider: route `minimax-byapi`, display name **MiniMax**. Streaming text and tool calls go through the official pi-ai adapter, over either the OpenAI-compatible or the Anthropic-compatible route. |
+| Chat provider | Registers a native dsh LLM provider: route `minimax-api`, display name **MiniMax**. Streaming text and tool calls go through the official pi-ai adapter, over either the OpenAI-compatible or the Anthropic-compatible route. |
 | Model catalog | `GET {root}/v1/models` discovery, merged with the plugin's built-in model constants, auto-categorized as chat, image, video, speech, music, research, or unknown. Only chat models enter the picker. Per-model overrides are available. |
 | Connection presets | Five access modes: pay-as-you-go (international / China) and M Plan subscription (international / China), plus a custom endpoint. The preset fills the base URL and the chat protocol. |
-| Settings page | Access mode, API address, API key, verification, timeout, the chat-model table (the picker's source of truth), and media-model selection. Copy follows the dsh language (English or Chinese). |
+| Settings page | Access mode, API address, API key, verification, timeout, the language-model table (the picker's source of truth), and separate image, video and speech model sections. The same form opens from `Settings → MiniMax API`. Copy follows the dsh language (English or Chinese). |
+| Usage in the sidebar | A MiniMax row at the foot of the sidebar shows the used share of the 5-hour and weekly M Plan limits; its panel adds the used/total counts and a reset countdown. It refreshes over the network every minute. A pay-as-you-go key has no M Plan quota, so the row hides itself. |
+| Connection probe | Opening the Models page tests the saved key once against `GET /v1/models` in the host and shows a single gray/green/red dot after the plugin tag; hovering it reveals the latency or the failure reason. The key never reaches the browser. |
 | Durable media tasks | Task records are per session and survive restarts. Downloads write `.part` files and are renamed after validation. A failed download can be retried without regenerating, so nothing is billed twice. |
 | Results in chat | Tool result cards, file preview, and a sidebar player for MP4, MP3 and WAV. Tool cards and the player follow the dsh language. |
 
-The plugin registers two components: `minimax-byapi` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 13 tools:
+The plugin registers two components: `minimax-api` (chat, model catalog, settings page) and `dsh-minimax-media` (media tools). Together they register 13 tools:
 
 | Tool | What it does |
 | --- | --- |
@@ -95,10 +97,12 @@ The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fr
 - The response field names are not documented upstream. The live answer (subscription key, measured) keeps the window data inside `model_remains[]` with one entry per model and reports the remaining share as `current_interval_remaining_percent` / `current_weekly_remaining_percent`; the counters are zero in that shape. The plugin reads that shape, and when several models are listed the tightest window wins. The older counter-shaped answer (top-level `current_*_usage_count`, reported by MiniMax issue trackers as *remaining* rather than used) is still parsed as a fallback. Treat the MiniMax console usage page as authoritative.
 - The quota is read on demand, never polled or cached.
 
-**Balance in the left sidebar.** The sidebar foot carries a MiniMax balance row: the 5-hour window's remaining percentage shows inline, and clicking it opens a panel with both windows, the remaining counts and the reset times. The widget refreshes itself every five minutes and can be refreshed by hand.
+**Usage in the left sidebar.** The sidebar foot carries a MiniMax usage row that shows the used share of both the 5-hour and the weekly limit without opening anything; clicking it opens a panel with both limits, their used amounts and percentages, and how long until each limit resets. The widget refreshes itself over the network every minute and can be refreshed by hand.
+
+**MiniMax settings tab.** `Settings → MiniMax API` opens the same connection, language-model and media configuration as the plugin detail page. Model rows stay single-line and scroll horizontally when needed; the delete action is an icon-only button.
 
 - Querying needs the API key, and keys stay in the dsh credential store and never cross the wire, so the query runs in the host process and the web client calls the host over `/api/minimaxQuota/quota`.
-- A pay-as-you-go key has no M Plan quota at all, so the row hides itself instead of showing an error.
+- A pay-as-you-go key has no M Plan quota at all, so the usage row hides itself instead of showing an error.
 
 ## Install
 
@@ -106,7 +110,7 @@ The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fr
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add dsh-minimax-byapi
+dsh plugin --profile minimax-test add dsh-minimax-api
 ```
 
 **From git:**
@@ -141,13 +145,13 @@ Keep the plugin in a dedicated profile until you are satisfied; this keeps the p
 Updating a git install means removing it and adding the new commit; local installs update with `git pull` and `npm install --ignore-scripts`; an npm install picks up the new version when you remove and re-add the plugin. Restart dsh afterwards.
 
 ```powershell
-dsh plugin --profile minimax-test remove dsh-minimax-byapi
+dsh plugin --profile minimax-test remove dsh-minimax-api
 ```
 
 Removing the plugin takes its layers out of the profile: the provider, the 13 tools and the settings page are gone. Generated media and task records are **not** deleted, and the credential is **not** removed either. Delete the data directory yourself if you want the files gone:
 
 ```powershell
-Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
+Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-api"
 ```
 
 Delete the credential in dsh if you no longer need it.
@@ -157,8 +161,8 @@ Delete the credential in dsh if you no longer need it.
 Use the plugin settings page for normal setup. Manual configuration in the profile's `cordis.patch.yml` is possible but optional:
 
 ```yaml
-- id: minimax-byapi
-  name: dsh-minimax-byapi
+- id: minimax-api
+  name: dsh-minimax-api
   config:
     connection:
       plan: coding-cn
@@ -188,7 +192,7 @@ Use the plugin settings page for normal setup. Manual configuration in the profi
 | `media.videoModel` | empty | Video model used when a call omits `model`. |
 | `media.speechModel` | empty | TTS model used when a call omits `model`. |
 | `media.musicModel` | empty | Music model used when a call omits `model`. Retired upstream; only existing paying accounts can call it. |
-| `media.dataDir` | empty | Media output directory; empty means `$DSH_HOME/plugins/dsh-minimax-byapi`. |
+| `media.dataDir` | empty | Media output directory; empty means `$DSH_HOME/plugins/dsh-minimax-api`. |
 | `modelOverrides` | `[]` | Per-model overrides written by the settings page: category, display name, image support, context window, max output, reasoning efforts. Applied on the next refresh. |
 
 `connection`, `media` and `modelOverrides` are volatile sections: after saving, dsh reloads the plugin layer and the model catalog is discovered again.
@@ -247,7 +251,7 @@ MiniMax has retired the music models, and since **2026-08-20** the music API is 
 
 - **Network:** only the MiniMax endpoint you configure. Discovery calls `GET {root}/v1/models`, chat uses the configured route, and the media tools call the image, video, speech, speech-to-text and music endpoints on the same host. No telemetry, no analytics, no third-party service.
 - **Credentials:** the key lives in the dsh credential service under the reference name `MINIMAX_API_KEY`; it is not written to YAML, to logs, to task records or to the repository. Media download requests are sent to MiniMax's own file host and carry no separate credential.
-- **Files:** generated media goes to `$DSH_HOME/plugins/dsh-minimax-byapi` (or `media.dataDir`). Task records may contain time-limited upstream URLs; treat them as private.
+- **Files:** generated media goes to `$DSH_HOME/plugins/dsh-minimax-api` (or `media.dataDir`). Task records may contain time-limited upstream URLs; treat them as private.
 - **Data leaves your machine:** prompts, the reference images you attach, the audio you upload for transcription and the text you synthesize are sent to MiniMax to be processed, exactly as you send them in the chat prompt. The plugin does not filter, redact or re-host that content.
 - **Not done by this plugin:** reading or reusing a MiniMax CLI token, installing or running other plugins, fetching runtime dependencies at install time, calling the server-side web search tool, voice cloning or voice design.
 
@@ -265,10 +269,10 @@ Installing any dsh plugin runs third-party code with your user permissions, and 
 
 Installation is successful when all four checks pass:
 
-1. `dsh --profile minimax-test --dump-config` lists the `minimax-byapi` layer.
-2. The Plugins page shows this plugin with both components (`minimax-byapi` and `dsh-minimax-media`) running.
+1. `dsh --profile minimax-test --dump-config` lists the `minimax-api` layer.
+2. The Plugins page shows this plugin with both components (`minimax-api` and `dsh-minimax-media`) running.
 3. `minimax_models` returns categorized model IDs.
-4. After `dsh plugin --profile minimax-test remove dsh-minimax-byapi`, the layers and components are gone.
+4. After `dsh plugin --profile minimax-test remove dsh-minimax-api`, the layers and components are gone.
 
 | Symptom | Fix |
 | --- | --- |
@@ -300,10 +304,10 @@ CI (`.github/workflows/ci.yml`) runs on Linux and Windows with Node 22.19 and 24
 Trusted publishing has to be registered for the package once. With npm CLI 11.16 or newer the registration can be done from the command line (an npm login is required first):
 
 ```bash
-npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
 ```
 
-`--file` takes the workflow file name only, `--repo` the `owner/repo` pair, and `--allow-publish` lets this trusted publisher run `npm publish` (`npm stage publish` is always allowed). The same registration can be made on npmjs.com under **Packages → `dsh-minimax-byapi` → Settings → Trusted publishing**:
+`--file` takes the workflow file name only, `--repo` the `owner/repo` pair, and `--allow-publish` lets this trusted publisher run `npm publish` (`npm stage publish` is always allowed). The same registration can be made on npmjs.com under **Packages → `dsh-minimax-api` → Settings → Trusted publishing**:
 
 | Field | Value |
 | --- | --- |
@@ -332,4 +336,4 @@ Further reading: [docs/connection-and-keys.md](docs/connection-and-keys.md) for 
 - Bugs and feature requests: [Issues](https://github.com/NingYuanLee/dsh-minimax-byapi/issues) (bug report and feature request templates are provided).
 - Security: [SECURITY.md](SECURITY.md) — please use GitHub's private vulnerability reporting.
 - License: [MIT](LICENSE). Copyright (c) 2026 NingYuanLee.
-- Repository: <https://github.com/NingYuanLee/dsh-minimax-byapi>. This is a community plugin project, not an official DeepSeek or MiniMax product. "ByAPI" means the plugin reaches MiniMax through the official API with your own key; it does not implement every MiniMax product feature.
+- Repository: <https://github.com/NingYuanLee/dsh-minimax-byapi>. This is a community plugin project, not an official DeepSeek or MiniMax product. "API access" means the plugin reaches MiniMax through the official API with your own key; it does not implement every MiniMax product feature.

@@ -1,8 +1,8 @@
 {
-  "name": "dsh-minimax-byapi",
-  "version": "0.1.2",
-  "displayName": "MiniMax ByAPI",
-  "description": "Native MiniMax for DeepSeek Harness: chat with a subscription (Coding Plan) key or a pay-as-you-go API key, plus image, video, speech and music generation over the official MiniMax API.",
+  "name": "dsh-minimax-api",
+  "version": "0.2.0",
+  "displayName": "MiniMax API Access",
+  "description": "Native MiniMax for DeepSeek Harness: chat with an M Plan subscription or a pay-as-you-go API key, image, video, speech and speech-to-text tools, and M Plan usage in the sidebar.",
   "license": "MIT",
   "author": "NingYuanLee",
   "type": "module",
@@ -79,6 +79,7 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-tool",
         "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
         "@deepseek-ai/dsh-client-ui-plugin-manager",

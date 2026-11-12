@@ -1,6 +1,6 @@
 # 接入方式与两类 Key
 
-本文说明 `dsh-minimax-byapi` 如何连接 MiniMax：接入方式预设、两种 Key 的差异、模型发现与模型状态。
+本文说明 `dsh-minimax-api` 如何连接 MiniMax：接入方式预设、两种 Key 的差异、模型发现与模型状态。
 
 ## 接入方式预设
 

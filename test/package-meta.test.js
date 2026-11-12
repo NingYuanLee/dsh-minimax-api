@@ -9,12 +9,12 @@ import { dirname, resolve } from 'node:path';
 const run = promisify(exec);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const specifiers = [
-  'dsh-minimax-byapi/locale/en.json',
-  'dsh-minimax-byapi/locale/zh.json',
-  'dsh-minimax-byapi/media/locale/en.json',
-  'dsh-minimax-byapi/media/locale/zh.json',
-  'dsh-minimax-byapi/icon',
-  'dsh-minimax-byapi/media/icon',
+  'dsh-minimax-api/locale/en.json',
+  'dsh-minimax-api/locale/zh.json',
+  'dsh-minimax-api/media/locale/en.json',
+  'dsh-minimax-api/media/locale/zh.json',
+  'dsh-minimax-api/icon',
+  'dsh-minimax-api/media/icon',
 ];
 const packed = [
   'locale/en.json',
@@ -57,8 +57,8 @@ test('locale files carry the English display metadata', async () => {
 
 test('the bundle patch points at real package specifiers', async () => {
   const patch = await readFile(resolve(root, 'cordis.patch.yml'), 'utf8');
-  assert.match(patch, /name: dsh-minimax-byapi\n/);
-  assert.match(patch, /name: dsh-minimax-byapi\/media/);
+  assert.match(patch, /name: dsh-minimax-api\n/);
+  assert.match(patch, /name: dsh-minimax-api\/media/);
   const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
   assert.ok(manifest.engines.dsh, 'engines.dsh gates installation');

@@ -111,31 +111,31 @@ test('英文界面渲染关键标签（设置页）', () => {
   assert.match(text, /API key/);
   assert.match(text, /Get models/);
   assert.match(text, /Save address and key/);
-  assert.match(text, /Chat models/);
-  assert.match(text, /Media models/);
+  assert.match(text, /Language models/);
+  assert.match(text, /Image model/);
+  assert.match(text, /Speech model/);
   assert.doesNotMatch(text, /minimax_edit_image/);
   assert.equal(byLabel(tree, 'API address').props.value, 'https://api.minimax.io/v1');
   assert.equal(byLabel(tree, 'API key').props.type, 'password');
   assert.equal(hasCjk(text), false, '英文界面不应残留中文：' + text);
-  // 展开对话模型表格：表头与操作按钮也走英文。
-  buttonByText(tree, 'Chat models').props.onClick();
+  // 语言模型表格始终渲染：表头与操作按钮也走英文。
   const chat = textsOf(current());
   assert.match(chat, /Model ID/);
   assert.match(chat, /Display name/);
   assert.match(chat, /Reasoning effort/);
-  assert.match(chat, /Save chat models/);
+  assert.match(chat, /Save language models/);
   assert.ok(byLabel(current(), 'Delete row 1'), '删除按钮的 aria-label 也是英文');
   assert.ok(byLabel(current(), 'Context 0'));
   assert.ok(byLabel(current(), 'Max output 0'));
   assert.equal(hasCjk(chat), false);
-  // 展开媒体模型：字段名是英文，且仍是原来的 aria-label 语义。
-  buttonByText(current(), 'Media models').props.onClick();
+  // 媒体模型卡片始终渲染：字段名是英文，且仍是原来的 aria-label 语义。
   const media = current();
-  assert.match(textsOf(media), /Image generation/);
-  assert.match(textsOf(media), /Speech generation/);
-  assert.match(textsOf(media), /Music generation/);
-  assert.ok(byLabel(media, 'Image generation'));
-  assert.ok(byLabel(media, 'Music generation'));
+  assert.match(textsOf(media), /Image model/);
+  assert.match(textsOf(media), /Speech model/);
+  assert.match(textsOf(media), /Video model/);
+  assert.ok(byLabel(media, 'Image model'));
+  assert.ok(byLabel(media, 'Video model'));
+  assert.equal(byLabel(media, 'Music generation'), undefined, '退役的音乐模型不再出现在媒体设置里');
   assert.equal(hasCjk(textsOf(media)), false);
 });
 
@@ -148,14 +148,13 @@ test('中文回退界面保持原有文案（旧宿主/不传 t）', () => {
   assert.match(text, /API 地址/);
   assert.match(text, /获取模型/);
   assert.match(text, /保存地址和密钥/);
-  assert.match(text, /对话模型/);
-  assert.match(text, /媒体模型/);
+  assert.match(text, /语言模型/);
+  assert.match(text, /图片模型/);
   assert.doesNotMatch(text, /minimax_edit_image/);
-  buttonByText(current(), '对话模型').props.onClick();
-  assert.match(textsOf(current()), /保存对话模型/);
-  buttonByText(current(), '媒体模型').props.onClick();
-  assert.match(textsOf(current()), /生成图片/);
-  assert.match(textsOf(current()), /生成音乐/);
+  assert.match(textsOf(current()), /保存语言模型/);
+    assert.match(textsOf(current()), /图片模型/);
+  assert.match(textsOf(current()), /视频模型/);
+  assert.doesNotMatch(textsOf(current()), /生成音乐/);
 });
 
 test('接入方式下拉列出五个选项，默认国内 M Plan（Anthropic 兼容）', () => {
@@ -228,7 +227,7 @@ test('en / zh 渲染工具卡片与媒体播放器', () => {
   assert.match(textsOf(Client.exports.MediaPreview({ content: undefined })), /正在加载媒体文件/);
 });
 
-test('只读提供商页与摘要都有英文，provider id 是 minimax-byapi', () => {
+test('只读提供商页与摘要都有英文，provider id 是 minimax-api', () => {
   const Client = loadClient();
   const enT = english(Client);
   const form = { state: { value: { connection: { baseURL: 'https://gateway.example/v1' } } } };
@@ -237,8 +236,8 @@ test('只读提供商页与摘要都有英文，provider id 是 minimax-byapi', 
   assert.match(detail, /read-only/);
   assert.match(detail, /API address/);
   assert.match(detail, /API key/);
-  assert.match(detail, /Plugins → dsh-minimax-byapi → MiniMax ByAPI/);
-  assert.match(detail, /minimax-byapi/, 'provider id 显示 minimax-byapi');
+  assert.match(detail, /Plugins → dsh-minimax-api → MiniMax API Access/);
+  assert.match(detail, /minimax-api/, 'provider id 显示 minimax-api');
   assert.match(detail, /Display name\s*MiniMax/, '显示名是 MiniMax');
   assert.doesNotMatch(detail, /xAI-CLIProxyAPI/);
   assert.equal(hasCjk(detail), false);
@@ -266,24 +265,33 @@ test('apply 注册字典并把 locale 传给每个槽位，documentPreview 标�
   };
   Client.exports.apply(ctx);
 
-  assert.deepEqual(binds, ['minimaxByapi'], 'documentPreview 标题绑定 minimaxByapi 命名空间');
+  assert.deepEqual(binds, ['minimaxApi'], 'documentPreview 标题绑定 minimaxApi 命名空间');
   assert.equal(dictionaries.length, 1, '字典只注册一次');
-  assert.equal(dictionaries[0].ns, 'minimaxByapi');
+  assert.equal(dictionaries[0].ns, 'minimaxApi');
   assert.deepEqual(Object.keys(dictionaries[0].dicts.zh).sort(), Object.keys(Client.exports.zh).sort());
   assert.deepEqual(Object.keys(dictionaries[0].dicts.en).sort(), Object.keys(Client.exports.en).sort());
   assert.ok(Client.exports.inject.includes('locale'), 'inject 声明 locale 服务');
 
-  assert.equal(registered.length, 18, '插件配置 + 两个组件能力页 + 十三个工具卡片 + 媒体侧栏 + 余额组件');
-  for (const { options } of registered) assert.equal(options.locale, 'minimaxByapi', options.name + ' 声明 locale');
+  assert.equal(registered.length, 20, '设置弹窗页签 + 插件配置 + 两个组件能力页 + 十三个工具卡片 + 媒体侧栏 + 余额组件 + 模型页插件标签');
+  for (const { options } of registered) assert.equal(options.locale, 'minimaxApi', options.name + ' 声明 locale');
   assert.ok(registered.some(entry => entry.options.name === 'plugins.bundle.config'));
   // 侧栏底部是 list 槽位：契约要求 id，用 key 会注册失败并让整个客户端条目卡在 loading。
   const footer = registered.find(entry => entry.options.name === 'sidebar.footer.action');
   assert.ok(footer, '注册了侧栏余额组件');
-  assert.equal(footer.options.id, 'dsh-minimax-byapi/quota', 'list 槽位按契约用 id 注册');
+  assert.equal(footer.options.id, 'dsh-minimax-api/quota', 'list 槽位按契约用 id 注册');
   assert.equal('key' in footer.options, false, 'list 槽位不接受 key');
-  // 其余四个槽位是 keyed 槽位，仍用 key。
+  // 设置弹窗页签同样是 list 槽位：id、order 与可本地化的 label 都是契约要求。
+  const section = registered.find(entry => entry.options.name === 'settings.section');
+  assert.ok(section, '注册了设置弹窗的 MiniMax 页签');
+  assert.equal(section.options.id, 'dsh-minimax-api', '设置页签用 id 标识');
+  assert.equal(section.options.order, 27);
+  assert.equal(section.options.label(), 'MiniMax API', '页签文案跟随 locale');
+  const providerCard = registered.find(entry => entry.options.name === 'settings.models.provider-card');
+  assert.ok(providerCard, '注册了模型页 provider-card 槽位');
+  assert.equal(providerCard.options.key, 'minimax-api', '按 settingsNs 分发 MiniMax 行');
+  // 其余槽位是 keyed 槽位，仍用 key。
   for (const entry of registered) {
-    if (entry.options.name === 'sidebar.footer.action') continue;
+    if (entry.options.name === 'sidebar.footer.action' || entry.options.name === 'settings.section') continue;
     assert.equal('id' in entry.options, false, entry.options.name + ' 是 keyed 槽位');
   }
   assert.equal(previewOptions.title(), 'MiniMax media player');
@@ -300,7 +308,7 @@ test('旧宿主没有 ctx.locale 时 apply 不崩，槽位不带 locale 且标�
     effect: fn => fn(),
   };
   assert.doesNotThrow(() => Client.exports.apply(ctx));
-  assert.equal(registered.length, 18);
+  assert.equal(registered.length, 20);
   for (const options of registered) assert.equal('locale' in options, false, '旧宿主不传 locale');
   assert.equal(previewOptions.title(), 'MiniMax 媒体播放');
 });

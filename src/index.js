@@ -10,10 +10,11 @@ import { buildChatAdapter } from './adapter.js';
 import { MediaManager } from './media.js';
 import { fetchQuota } from './minimax-api.js';
 import { MinimaxQuotaService, QUOTA_NAMESPACE } from './quota-service.js';
+import { MinimaxProbeService, PROBE_NAMESPACE } from './probe-service.js';
 import { MinimaxRuntime } from './service.js';
 
-export const name = 'minimax-byapi';
-export const packageName = 'dsh-minimax-byapi';
+export const name = 'minimax-api';
+export const packageName = 'dsh-minimax-api';
 export const inject = ['llm', 'credentials', 'tools'];
 // 与官方模型配置一致：密钥存在 dsh 凭据库里，配置里只保留这个引用名。
 // 设置页写密钥时固定写到该引用，apiKeyEnv 由插件自己维护，用户无需看到。
@@ -58,12 +59,12 @@ export async function apply(ctx, config) {
   const abort = new AbortController();
   // 设置命名空间 = 本插件实例在 profile 里的 id（cordis.patch.yml 的 - id:）。
   // 模型弹窗用它把「MiniMax」这一行对上本插件的配置。
-  const instanceId = () => ctx?.fiber?.entry?.options?.id || 'minimax-byapi';
+  const instanceId = () => ctx?.fiber?.entry?.options?.id || 'minimax-api';
   const managers = new Map();
   const connection = () => config.connection.get();
   const mediaConfig = () => config.media.get();
   // 结果保存位置：留空用插件默认目录；~ 与环境变量由 catalog.expandPath 展开。
-  const defaultDataDir = () => resolve(process.env.DSH_HOME || resolve(homedir(), '.dsh'), 'plugins', 'dsh-minimax-byapi');
+  const defaultDataDir = () => resolve(process.env.DSH_HOME || resolve(homedir(), '.dsh'), 'plugins', 'dsh-minimax-api');
   const dataDir = () => resolve(expandPath(mediaConfig().dataDir) || defaultDataDir());
   // 解析调用密钥：插件设置里直接填写的 apiKey 优先；留空则回退到凭据引用。
   const readKey = async (configValue) => {
@@ -128,6 +129,35 @@ export async function apply(ctx, config) {
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
     return Buffer.concat(pieces, size).toString('utf8');
   }
+  // 「模型」页的测试连接：用已保存的密钥请求一次模型列表，只回延迟、状态和数量。
+  async function probe() {
+    const captured = structuredClone(connection());
+    const key = await readKey(captured);
+    const baseURL = normalizeBaseURL(captured.baseURL);
+    const limit = Math.min(captured.timeoutMs, 15000);
+    const started = Date.now();
+    let response;
+    try {
+      response = await fetch(modelsURL(baseURL), { headers: { authorization: 'Bearer ' + key, accept: 'application/json' }, redirect: 'error', signal: AbortSignal.any([abort.signal, AbortSignal.timeout(limit)]) });
+    } catch (error) {
+      if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new Error('连接超时（' + limit + 'ms）');
+      throw new Error('无法连接 ' + baseURL);
+    }
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new Error('认证被拒绝（HTTP ' + response.status + '）');
+      if (response.status === 404 || response.status === 405) throw new Error('该地址没有开放模型列表接口（HTTP ' + response.status + '）');
+      throw new Error('HTTP ' + response.status);
+    }
+    let models;
+    try {
+      const body = JSON.parse(await readBounded(response));
+      models = Array.isArray(body?.data) ? body.data.length : Array.isArray(body?.models) ? body.models.length : undefined;
+    } catch { /* 模型数只是附加信息，读不到不影响连接结论 */ }
+    let host;
+    try { host = new URL(baseURL).host; } catch { host = undefined; }
+    return { host, status: response.status, models, latencyMs: Date.now() - started };
+  }
+
   async function refresh(signal) {
     if (closed) throw new Error('插件已经停止');
     if (refreshPromise) return refreshPromise;
@@ -173,7 +203,7 @@ export async function apply(ctx, config) {
       const message = typeof error?.message === 'string' ? error.message : '';
       const opaque = error instanceof TypeError || error instanceof SyntaxError || /HTTP \d+/.test(message);
       lastError = error?.name === 'TimeoutError' ? '模型发现超时' : !message || opaque ? '模型发现失败，请检查连接、密钥或模型覆盖配置' : message;
-      ctx.logger?.warn?.('minimax-byapi: ' + lastError);
+      ctx.logger?.warn?.('minimax-api: ' + lastError);
       throw new Error(lastError);
     }).finally(() => { refreshPromise = undefined; });
     return refreshPromise;
@@ -193,7 +223,7 @@ export async function apply(ctx, config) {
       await instance.init();
       instance.startWatchers(abort.signal, task => {
         const level = task.status === 'saved' ? 'info' : 'warn';
-        ctx.logger?.[level]?.('minimax-byapi: 媒体任务 ' + task.id + ' ' + task.status);
+        ctx.logger?.[level]?.('minimax-api: 媒体任务 ' + task.id + ' ' + task.status);
       });
       return instance;
       })();
@@ -217,14 +247,14 @@ export async function apply(ctx, config) {
   // 做法：描述支持函数，并在每次刷新后用最新描述重新注册（工具定义会被快照，getter 不够）。
   // 设置页「获取模型」把草稿地址和一次性密钥交给这个回调；命名空间必须是插件实例 id。
   try { ctx.llm?.registerModelDiscovery?.(instanceId(), (request, signal) => discover(request, signal)); }
-  catch (error) { ctx.logger?.warn?.('minimax-byapi: registerModelDiscovery 失败 ' + (error?.message || error)); }
+  catch (error) { ctx.logger?.warn?.('minimax-api: registerModelDiscovery 失败 ' + (error?.message || error)); }
   // 头像菜单里的「模型」页只列出声明过的可配置提供商。空 settingsPath 表示整段插件配置
   // 都属于这一行，所以密钥还没配好时这一行也在。和 Qoder 连接器同一套注册。
   try {
     directory = ctx.llm?.registerConfigurableProviders?.([{
       provider: name, displayName: 'MiniMax', settingsNs: instanceId(), settingsPath: [], declared: false,
     }]);
-  } catch (error) { ctx.logger?.warn?.('minimax-byapi: registerConfigurableProviders 失败 ' + (error?.message || error)); }
+  } catch (error) { ctx.logger?.warn?.('minimax-api: registerConfigurableProviders 失败 ' + (error?.message || error)); }
   const toolFactories = [];
   const toolDisposers = [];
   function tool(toolName, description, parameters, run) {
@@ -245,7 +275,7 @@ export async function apply(ctx, config) {
     for (const build of toolFactories) toolDisposers.push(ctx.tools.register(build()));
     // 媒体组件的工具也用这份清单拼描述，由它自己挂在这里重建。
     for (const notify of [...refreshedListeners]) {
-      try { notify(); } catch (error) { ctx.logger?.warn?.('minimax-byapi: 媒体工具重建失败 ' + (error?.message || error)); }
+      try { notify(); } catch (error) { ctx.logger?.warn?.('minimax-api: 媒体工具重建失败 ' + (error?.message || error)); }
     }
   }
   // 工具描述就是模型唯一能看到的"接口文档"：写清什么时候用、每个参数的含义与边界、
@@ -258,7 +288,7 @@ export async function apply(ctx, config) {
   };
   const runtime = {
     abort, connection, mediaConfig, catalog: () => catalog, lastError: () => lastError,
-    refresh, verifyKey, discover, manager, requireModel, describeModels, quota,
+    refresh, verifyKey, discover, probe, manager, requireModel, describeModels, quota,
     // 首轮发现不再阻塞 apply()：需要等清单落定的一方（测试、宿主的准备流程）await 这个 promise。
     ready: null,
   };
@@ -268,7 +298,13 @@ export async function apply(ctx, config) {
   try {
     ctx.provide(QUOTA_NAMESPACE, new MinimaxQuotaService(runtime));
   } catch (error) {
-    ctx.logger?.warn?.('minimax-byapi: 注册额度接口失败 ' + (error?.message || error));
+    ctx.logger?.warn?.('minimax-api: 注册额度接口失败 ' + (error?.message || error));
+  }
+  // 「模型」页卡片里的测试连接：/api/minimaxProbe/test，密钥同样不出宿主。
+  try {
+    ctx.provide(PROBE_NAMESPACE, new MinimaxProbeService(runtime));
+  } catch (error) {
+    ctx.logger?.warn?.('minimax-api: 注册连接测试接口失败 ' + (error?.message || error));
   }
   // defineTool 会把工具描述快照成字符串，清单变化后媒体工具必须重建，所以这里提供订阅点。
   const refreshedListeners = new Set();

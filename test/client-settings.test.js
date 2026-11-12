@@ -83,9 +83,8 @@ function mount(Client, options = {}) {
   return current;
 }
 
-function openChat(current) {
-  const toggle = buttonByText(current(), '对话模型');
-  if (toggle?.props?.['aria-expanded'] !== 'true') toggle.props.onClick();
+function openChat() {
+  // 语言模型区不再折叠，表格始终渲染。
 }
 async function discoveredTree(Client, mutate) {
   const current = mount(Client, { mutate });
@@ -101,25 +100,22 @@ test('远程发现结果包在 ok/value 里时仍能列出模型', async () => {
   const Client = loadClient();
   const current = mount(Client, { discover: async () => ({ ok: true, value: DISCOVERED }) });
   await buttonByText(current(), '获取模型').props.onClick();
-  assert.match(statusText(current()), /已从 MiniMax ByAPI 发现 6 个模型/);
+  assert.match(statusText(current()), /已发现 6 个模型/);
 });
 
 test('点获取模型后提示数量，媒体下拉只列同类模型', async () => {
   const Client = loadClient();
   const current = await discoveredTree(Client);
-  buttonByText(current(), '媒体模型').props.onClick();
-  const tree = current();
-  assert.match(statusText(tree), /已从 MiniMax ByAPI 发现 6 个模型/);
+    const tree = current();
+  assert.match(statusText(tree), /已发现 6 个模型/);
   assert.equal(current.seen[0].baseURL, BASE_URL);
   assert.equal(current.seen[0].apiKey, undefined);
-  const ids = walk(byLabel(tree, '生成图片')).filter(n => n.type === 'option').map(n => n.props.value);
-  assert.deepEqual(ids, ['', 'image-01']);
-  const videos = walk(byLabel(tree, '生成视频')).filter(n => n.type === 'option').map(n => n.props.value);
-  assert.deepEqual(videos, ['', 'video-01']);
-  const speeches = walk(byLabel(tree, '生成语音')).filter(n => n.type === 'option').map(n => n.props.value);
-  assert.deepEqual(speeches, ['', 'speech-02-hd']);
-  const musics = walk(byLabel(tree, '生成音乐')).filter(n => n.type === 'option').map(n => n.props.value);
-  assert.deepEqual(musics, ['', 'music-01']);
+  for (const label of ['图片模型', '视频模型', '语音模型']) byLabel(current(), label).props.onClick();
+  const open = current();
+  const optionsOf = key => walk(open).filter(n => n.props?.['data-picker'] === key && n.props?.['data-model'] !== undefined).map(n => n.props['data-model']);
+  assert.deepEqual(optionsOf('imageModel'), ['', 'image-01']);
+  assert.deepEqual(optionsOf('videoModel'), ['', 'video-01']);
+  assert.deepEqual(optionsOf('speechModel'), ['', 'speech-02-hd']);
   assert.equal(byLabel(tree, '启用生成图片'), undefined);
 });
 
@@ -139,10 +135,9 @@ test('已保存的模型在未获取清单时也能回显，获取后去重', as
     modelOverrides: [{ id: 'MiniMax-M2', displayName: 'MiniMax M2', imageSupported: false, contextWindow: 204800, maxTokens: 32768, reasoningEfforts: [] }],
   } });
   openChat(current);
-  buttonByText(current(), '媒体模型').props.onClick();
-  const before = walk(chatSelect(current())).filter(n => n.type === 'option').map(n => n.props.value);
+    const before = walk(chatSelect(current())).filter(n => n.type === 'option').map(n => n.props.value);
   assert.deepEqual(before, ['', 'MiniMax-M2']);
-  assert.equal(byLabel(current(), '生成图片').props.value, 'image-01');
+  assert.equal(byLabel(current(), '图片模型').props['data-model-value'], 'image-01');
   await buttonByText(current(), '获取模型').props.onClick();
   const after = walk(chatSelect(current())).filter(n => n.type === 'option').map(n => n.props.value);
   assert.equal(after.filter(id => id === 'MiniMax-M2').length, 1);
@@ -166,8 +161,8 @@ test('已配置密钥时按引用名数组查询并自动展开模型', async ()
   for (const effect of Client.runtime.effects) effect();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(described, [['MINIMAX_API_KEY']]);
-  assert.match(statusText(current()), /已从 MiniMax ByAPI 发现 6 个模型/);
-  assert.equal(buttonByText(current(), '对话模型').props['aria-expanded'], 'true');
+  assert.match(statusText(current()), /已发现 6 个模型/);
+  assert.ok(byLabel(current(), '模型 ID 0'), '语言模型表始终渲染');
   assert.ok(walk(chatSelect(current())).some(n => n.props?.value === 'MiniMax-M2'));
 });
 
@@ -191,7 +186,7 @@ test('插件详情页等配置读完再自动获取，不用空地址', async ()
   const described = new Promise(resolve => { release = resolve; });
   const value = { connection: { baseURL: 'https://gateway.example/v1', api: 'anthropic-messages' }, media: {}, modelOverrides: [] };
   const remote = {
-    settings: { describe: () => described.then(() => ({ ok: true, value: { namespaces: [{ ns: 'minimax-byapi', value, revision: 3 }] } })) },
+    settings: { describe: () => described.then(() => ({ ok: true, value: { namespaces: [{ ns: 'minimax-api', value, revision: 3 }] } })) },
     credentials: { describe: async () => ({ ok: true, value: { MINIMAX_API_KEY: { configured: true } } }) },
     llm: { discoverModels: async (_ns, request) => { seen.push(request); return { ok: true, value: DISCOVERED }; } },
   };
@@ -206,7 +201,7 @@ test('插件详情页等配置读完再自动获取，不用空地址', async ()
   assert.equal(seen.length, 1);
   assert.equal(seen[0].baseURL, 'https://gateway.example/v1');
   assert.equal(seen[0].api, 'anthropic-messages');
-  assert.match(statusText(runtime.renders.at(-1)), /已从 MiniMax ByAPI 发现 6 个模型/);
+  assert.match(statusText(runtime.renders.at(-1)), /已发现 6 个模型/);
   assert.doesNotMatch(statusText(runtime.renders.at(-1)), /provider route/);
 });
 
@@ -224,7 +219,7 @@ test('详情页保存解包 namespace view：媒体模型不回退，下一次�
   };
   const remote = {
     settings: {
-      describe: async () => ({ ok: true, value: { namespaces: [{ ns: 'minimax-byapi', value: baseValue, revision: 3 }] } }),
+      describe: async () => ({ ok: true, value: { namespaces: [{ ns: 'minimax-api', value: baseValue, revision: 3 }] } }),
       mutate: async (ns, ops, revision) => {
         calls.push({ ns, ops, revision });
         const overrides = ops.find(op => op.path[0] === 'modelOverrides');
@@ -241,15 +236,14 @@ test('详情页保存解包 namespace view：媒体模型不回退，下一次�
   await new Promise(resolve => setTimeout(resolve, 20));
   const current = () => runtime.renders.at(-1);
   openChat(current);
-  buttonByText(current(), '媒体模型').props.onClick();
-  assert.equal(byLabel(current(), '生成图片').props.value, 'image-01');
+    assert.equal(byLabel(current(), '图片模型').props['data-model-value'], 'image-01');
   byLabel(current(), '删除第 1 行').props.onClick();
-  await buttonByText(current(), '保存对话模型').props.onClick();
+  await buttonByText(current(), '保存语言模型').props.onClick();
   assert.equal(calls.length, 1);
   assert.equal(calls[0].revision, 3);
   assert.deepEqual(calls[0].ops.find(op => op.path[0] === 'modelOverrides').value, []);
-  assert.equal(byLabel(current(), '生成图片').props.value, 'image-01', '保存后媒体模型不能回退成不使用');
-  assert.match(statusText(current()), /已保存 0 条对话模型/);
+  assert.equal(byLabel(current(), '图片模型').props['data-model-value'], 'image-01', '保存后媒体模型不能回退成不使用');
+  assert.match(statusText(current()), /已保存 0 条语言模型/);
   await buttonByText(current(), '保存媒体模型').props.onClick();
   assert.equal(calls.length, 2);
   assert.equal(calls[1].revision, 4, '第二次保存必须用保存后返回的 revision');
@@ -261,7 +255,7 @@ test('宿主拒绝空地址时不把英文原文露出来', async () => {
   const Client = loadClient();
   const current = mount(Client, { discover: async () => ({ ok: false, error: { message: 'model discovery needs a provider route or a baseURL' } }) });
   await buttonByText(current(), '获取模型').props.onClick();
-  assert.match(statusText(current()), /还没有可用的 API 地址/);
+  assert.match(statusText(current()), /没有可用的 API 地址/);
   assert.doesNotMatch(statusText(current()), /provider route/);
 });
 
@@ -269,13 +263,12 @@ test('打开页面就有一行空的聊天模型', () => {
   const Client = loadClient();
   const current = mount(Client);
   openChat(current);
-  buttonByText(current(), '媒体模型').props.onClick();
-  const tree = current();
+    const tree = current();
   const model = chatSelect(tree);
   assert.equal(model.props.value, '');
   assert.deepEqual(walk(model).filter(n => n.type === 'option').map(n => n.props.value), ['']);
-  assert.equal(byLabel(tree, '生成图片').props.value, '');
-  assert.equal(byLabel(tree, '生成音乐').props.value, '');
+  assert.equal(byLabel(tree, '图片模型').props['data-model-value'], '');
+  assert.equal(byLabel(tree, '生成音乐'), undefined, '退役的生成音乐不再出现在媒体模型里');
   assert.equal(byLabel(tree, '启用生成图片'), undefined);
   assert.equal(walk(tree).some(n => n.props?.type === 'radio'), false);
 });
@@ -297,7 +290,7 @@ test('保存对话模型只提交覆盖，并清掉已无用的默认模型', as
   const current = await discoveredTree(Client, async (ops, revision) => { calls.push({ ops, revision }); return true; });
   await buttonByText(current(), '添加').props.onClick();
   chatSelect(current()).props.onChange({ target: { value: 'MiniMax-M2' } });
-  await buttonByText(current(), '保存对话模型').props.onClick();
+  await buttonByText(current(), '保存语言模型').props.onClick();
   assert.equal(calls.length, 1);
   const ops = calls[0].ops;
   const overrides = ops.find(o => o.path[0] === 'modelOverrides').value;
@@ -323,7 +316,7 @@ test('删掉的对话模型不会在保存时被加回', async () => {
   openChat(current);
   await buttonByText(current(), '获取模型').props.onClick();
   byLabel(current(), '删除第 1 行').props.onClick();
-  await buttonByText(current(), '保存对话模型').props.onClick();
+  await buttonByText(current(), '保存语言模型').props.onClick();
   const overrides = calls[0].find(o => o.path[0] === 'modelOverrides').value;
   assert.deepEqual(overrides.map(row => row.id), ['MiniMax-M1']);
 });
@@ -344,14 +337,14 @@ test('删除按钮在每行最前，尺寸与添加一致，红字红边', () =>
   const cells = [].concat(row.children).filter(n => n?.type === 'td');
   assert.equal(cells[0].children[0].props['aria-label'], '删除第 1 行');
   assert.equal(cells[1].children[0].props['aria-label'], '模型 ID 0');
-  const del = cells[0].children[0].props.style;
-  const add = buttonByText(tree, '添加').props.style;
-  assert.equal(del.height, add.height);
-  assert.equal(del.padding, add.padding);
-  assert.equal(del.fontSize, add.fontSize);
-  assert.equal(del.borderRadius, add.borderRadius);
-  assert.match(String(del.color), /error-primary/);
-  assert.match(String(del.border), /error-primary/);
+  const del = cells[0].children[0];
+  assert.ok(walk(del).some(n => n.type === 'svg'), '删除按钮用图标代替文字');
+  assert.equal(textsOf(del).trim(), '', '删除按钮不显示文字');
+  assert.equal(del.props.style.width, 28);
+  assert.equal(del.props.style.height, 28);
+  assert.equal(del.props.style.padding, 0);
+  assert.match(String(del.props.style.color), /error-primary/);
+  assert.match(String(del.props.style.border), /error-primary/);
   assert.equal(walk(tree).some(n => n.props?.type === 'radio'), false);
   assert.equal(byLabel(tree, '删除第 1 行').props.disabled, false);
   assert.equal(byLabel(tree, '删除第 2 行').props.disabled, false);
@@ -370,7 +363,7 @@ test('上下文/最大输出接受 M 与 K 后缀', async () => {
   chatSelect(current()).props.onChange({ target: { value: 'MiniMax-M2' } });
   byLabel(current(), '上下文 1').props.onChange({ target: { value: '1M' } });
   byLabel(current(), '最大输出 1').props.onChange({ target: { value: '64K' } });
-  await buttonByText(current(), '保存对话模型').props.onClick();
+  await buttonByText(current(), '保存语言模型').props.onClick();
   const overrides = calls[0].find(o => o.path[0] === 'modelOverrides').value;
   assert.equal(overrides.at(-1).contextWindow, 1000000);
   assert.equal(overrides.at(-1).maxTokens, 64000); // K = 1000，与界面提示一致
@@ -383,9 +376,9 @@ test('非法大小被拦下且不提交', async () => {
   await buttonByText(current(), '添加').props.onClick();
   chatSelect(current()).props.onChange({ target: { value: 'MiniMax-M2' } });
   byLabel(current(), '最大输出 1').props.onChange({ target: { value: 'abc' } });
-  await buttonByText(current(), '保存对话模型').props.onClick();
+  await buttonByText(current(), '保存语言模型').props.onClick();
   assert.equal(calls.length, 0);
-  assert.match(statusText(current()), /最大输出 token/);
+  assert.match(statusText(current()), /最大输出/);
 });
 
 test('思考强度是多选选项', async () => {
@@ -398,6 +391,9 @@ test('思考强度是多选选项', async () => {
   assert.equal(effort.props.style.fontSize, 11);
   assert.equal(textsOf(effort), '未设置', 'MiniMax 没有公开的思考强度分档，默认不勾选');
   effort.props.onClick();
+  const menu = walk(current()).find(n => n.props?.role === 'group' && String(n.props['aria-label'] || '').startsWith('思考强度选项'));
+  assert.ok(menu, '打开思考强度菜单');
+  assert.equal(menu.props.style.position, 'fixed', '菜单用视口浮层，避免被表格裁掉');
   const efforts = walk(current()).filter(n => n.type === 'input' && String(n.props?.['aria-label'] || '').startsWith('思考强度 '));
   assert.deepEqual(efforts.map(n => n.props['aria-label']), ['思考强度 none 1', '思考强度 low 1', '思考强度 medium 1', '思考强度 high 1', '思考强度 xhigh 1', '思考强度 max 1']);
   efforts.find(n => n.props['aria-label'] === '思考强度 low 1').props.onChange({ target: { checked: true } });
@@ -418,8 +414,8 @@ test('提供商信息是只读的，并指向真正的配置位置', () => {
   const tree = Client.exports.MinimaxProviderNotice({ view: 'detail', form: { state: { value: { connection: { baseURL: BASE_URL } } } } });
   assert.equal(walk(tree).some(n => n.type === 'input'), false, '只读页不应有任何输入控件');
   const text = textsOf(tree);
-  assert.match(text, /minimax-byapi/);
-  assert.match(text, /插件 → dsh-minimax-byapi → MiniMax ByAPI/);
+  assert.match(text, /minimax-api/);
+  assert.match(text, /插件 → dsh-minimax-api → MiniMax API接入/);
   assert.match(text, /只读/);
 });
 
@@ -434,13 +430,13 @@ test('媒体模型下拉按 MiniMax 官方模型名分类', async () => {
   ];
   const current = mount(Client, { discover: async () => real });
   await buttonByText(current(), '获取模型').props.onClick();
-  buttonByText(current(), '媒体模型').props.onClick();
-  const tree = current();
-  const optionsOf = label => walk(byLabel(tree, label)).filter(n => n.type === 'option').map(n => n.props.value);
-  assert.deepEqual(optionsOf('生成图片'), ['', 'image-01']);
-  assert.deepEqual(optionsOf('生成视频'), ['', 'MiniMax-H3']);
-  assert.deepEqual(optionsOf('生成语音'), ['', 'speech-2.8-hd']);
-  assert.deepEqual(optionsOf('生成音乐'), ['', 'music-3.0']);
+    const tree = current();
+  for (const label of ['图片模型', '视频模型', '语音模型']) byLabel(current(), label).props.onClick();
+  const open = current();
+  const optionsOf = key => walk(open).filter(n => n.props?.['data-picker'] === key && n.props?.['data-model'] !== undefined).map(n => n.props['data-model']);
+  assert.deepEqual(optionsOf('imageModel'), ['', 'image-01']);
+  assert.deepEqual(optionsOf('videoModel'), ['', 'MiniMax-H3']);
+  assert.deepEqual(optionsOf('speechModel'), ['', 'speech-2.8-hd']);
 });
 
 test('配置挂在插件上，每个媒体工具都有结果卡片', () => {
@@ -455,11 +451,11 @@ test('配置挂在插件上，每个媒体工具都有结果卡片', () => {
   Client.exports.apply(ctx);
   const bundles = registered.filter(r => r.name === 'plugins.bundle.config');
   assert.equal(bundles.length, 1);
-  assert.equal(bundles[0].key, 'dsh-minimax-byapi');
+  assert.equal(bundles[0].key, 'dsh-minimax-api');
   assert.match(textsOf(bundles[0].component({ view: 'summary' })), /MiniMax 连接、密钥与模型参数/);
   const rows = registered.filter(r => r.name === 'plugins.row.config');
-  assert.deepEqual(rows.map(r => r.key).sort(), ['dsh-minimax-byapi#dsh-minimax-media', 'dsh-minimax-byapi#minimax-byapi']);
-  const chat = rows.find(row => row.key.endsWith('#minimax-byapi'));
+  assert.deepEqual(rows.map(r => r.key).sort(), ['dsh-minimax-api#dsh-minimax-media', 'dsh-minimax-api#minimax-api']);
+  const chat = rows.find(row => row.key.endsWith('#minimax-api'));
   const media = rows.find(row => row.key.endsWith('#dsh-minimax-media'));
   const chatText = textsOf(chat.component({ view: 'page' }));
   const mediaText = textsOf(media.component({ view: 'page' }));
@@ -475,7 +471,7 @@ test('配置挂在插件上，每个媒体工具都有结果卡片', () => {
   assert.match(mediaText, /音乐模型官方已退役/);
   assert.match(mediaText, /不提供：实时语音/);
   assert.doesNotMatch(mediaText, /不提供：语音识别/);
-  assert.match(mediaText, /minimax-byapi/);
+  assert.match(mediaText, /minimax-api/);
   assert.doesNotMatch(mediaText, /刷新模型目录/);
   assert.equal(walk(chat.component({ view: 'page' })).some(n => n.type === 'input'), false);
   assert.equal(walk(media.component({ view: 'page' })).some(n => n.type === 'input'), false);
@@ -490,7 +486,7 @@ test('插件详情页自己读取设置，不依赖页面传入的表单', async
   runtime.hooks = [];
   const value = { connection: { baseURL: BASE_URL }, media: {}, modelOverrides: [] };
   const seen = [];
-  runtime.render = () => { runtime.cursor = 0; runtime.effects = []; return Client.exports.MinimaxSettings({ view: 'page', remote: { settings: { describe: async () => { seen.push('describe'); return { ok: true, value: { namespaces: [{ ns: 'minimax-byapi', value, revision: 3 }] } }; } } } }); };
+  runtime.render = () => { runtime.cursor = 0; runtime.effects = []; return Client.exports.MinimaxSettings({ view: 'page', remote: { settings: { describe: async () => { seen.push('describe'); return { ok: true, value: { namespaces: [{ ns: 'minimax-api', value, revision: 3 }] } }; } } } }); };
   runtime.renders = [runtime.render()];
   const before = runtime.renders.length;
   for (const effect of runtime.effects.slice()) effect();
@@ -511,7 +507,7 @@ test('首次挂载（还没获取模型）不抛错：effect 不能解引用 nul
   for (const effect of runtime.effects.slice()) await effect();
   await new Promise(r => setTimeout(r, 0));
   const text = textsOf(runtime.renders[runtime.renders.length - 1]) || '';
-  assert.match(text, /对话模型/, '面板应完整渲染');
+  assert.match(text, /语言模型/, '面板应完整渲染');
   assert.match(text, /获取模型/);
 });
 
@@ -588,7 +584,7 @@ test('自定义代理地址不被协议切换改写', () => {
   assert.equal(byLabel(current(), '接入方式').props.value, 'custom');
 });
 
-test('媒体模型下拉下方显示所选模型的简介', () => {
+test('各媒体模型卡片始终显示所选模型的简介', () => {
   const Client = loadClient();
   const current = mount(Client, { state: {
     connection: { baseURL: BASE_URL },
@@ -596,16 +592,27 @@ test('媒体模型下拉下方显示所选模型的简介', () => {
     modelOverrides: [],
   } });
   const text = textsOf(current());
-  // 媒体模型区默认折叠，先展开
-  assert.doesNotMatch(text, /文生图与图生图/, '折叠时不渲染简介');
-  buttonByText(current(), '媒体模型').props.onClick();
-  const expanded = textsOf(current());
-  assert.match(expanded, /文生图与图生图/, '图片模型要有简介');
-  assert.match(expanded, /视频 v2 接口，画质优先/, '视频模型要有简介');
-  // 未选择媒体模型时不显示简介
+  assert.match(text, /文生图\/图生图/, '图片模型要有简介');
+  assert.match(text, /v2，768P\/2K/, '视频模型要有简介');
   const blank = mount(Client, { state: { connection: { baseURL: BASE_URL }, media: {}, modelOverrides: [] } });
-  buttonByText(blank(), '媒体模型').props.onClick();
-  assert.doesNotMatch(textsOf(blank()), /文生图与图生图/);
+  assert.doesNotMatch(textsOf(blank()), /文生图\/图生图/);
+});
+
+test('媒体模型拆成图片/视频/语音三张常展开卡片，标题带图标', () => {
+  const Client = loadClient();
+  const tree = mount(Client)();
+  const text = textsOf(tree);
+  assert.match(text, /图片模型/);
+  assert.match(text, /视频模型/);
+  assert.match(text, /语音模型/);
+  const collapseToggle = walk(tree).find(n => n.type === 'button' && /^[▸▾]\s*媒体模型$/.test(textsOf(n).trim()));
+  assert.equal(collapseToggle, undefined, '不再有折叠媒体模型的按钮');
+  const headings = walk(tree).filter(n => n.type === 'h3');
+  const mediaHeadings = headings.filter(n => /(图片模型|视频模型|语音模型)/.test(textsOf(n)));
+  assert.equal(mediaHeadings.length, 3, '三张媒体卡片都直接渲染');
+  for (const heading of mediaHeadings) assert.ok(walk(heading).some(n => n.type === 'svg'), '每个媒体标题带图标');
+  const languageHeading = headings.find(n => /语言模型/.test(textsOf(n)));
+  assert.ok(languageHeading && walk(languageHeading).some(n => n.type === 'svg'), '语言模型标题带图标');
 });
 
 test('已保存的 API 地址原样回显', () => {
@@ -623,19 +630,16 @@ test('未获取清单时保存媒体模型仍保留已选 ID', async () => {
   const current = mount(Client, {
     state: {
       connection: { baseURL: BASE_URL },
-      media: { imageModel: 'image-01', videoModel: '', speechModel: '', musicModel: 'music-01', defaultModel: 'MiniMax-M2' },
+      media: { imageModel: 'image-01', videoModel: '', speechModel: '', defaultModel: 'MiniMax-M2' },
       modelOverrides: [],
     },
     mutate: async ops => { calls.push(ops); return true; },
   });
-  buttonByText(current(), '媒体模型').props.onClick();
-  assert.equal(byLabel(current(), '生成图片').props.value, 'image-01');
-  assert.equal(byLabel(current(), '生成音乐').props.value, 'music-01');
+    assert.equal(byLabel(current(), '图片模型').props['data-model-value'], 'image-01');
   assert.equal(byLabel(current(), '启用生成图片'), undefined);
   await buttonByText(current(), '保存媒体模型').props.onClick();
   const media = calls[0].find(op => op.path.length === 1 && op.path[0] === 'media').value;
   assert.equal(media.imageModel, 'image-01');
-  assert.equal(media.musicModel, 'music-01');
   assert.equal('defaultModel' in media, false);
 });
 
@@ -650,9 +654,9 @@ test('选不使用后再保存会清空该媒体模型', async () => {
     },
     mutate: async ops => { calls.push(ops); return true; },
   });
-  buttonByText(current(), '媒体模型').props.onClick();
-  byLabel(current(), '生成图片').props.onChange({ target: { value: '' } });
-  assert.equal(byLabel(current(), '生成图片').props.value, '');
+    byLabel(current(), '图片模型').props.onClick();
+  walk(current()).find(n => n.props?.['data-picker'] === 'imageModel' && n.props['data-model'] === '').props.onClick();
+  assert.equal(byLabel(current(), '图片模型').props['data-model-value'], '');
   await buttonByText(current(), '保存媒体模型').props.onClick();
   const media = calls[0].find(op => op.path.length === 1 && op.path[0] === 'media').value;
   assert.equal(media.imageModel, '');

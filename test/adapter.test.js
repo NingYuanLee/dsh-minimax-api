@@ -29,14 +29,14 @@ test('official adapter preserves tool call roundtrip and credential reference', 
   // The capture must yield the official adapter, not a look-alike: this is the
   // assertion that turns a dsh registration change into a failing test.
   assert.ok(adapter instanceof LlmAdapter, 'captured adapter must be an official LlmAdapter instance');
-  assert.equal(adapter.providerInfo('minimax-byapi').id, 'minimax-byapi');
-  const catalog = await adapter.listModels('minimax-byapi');
+  assert.equal(adapter.providerInfo('minimax-api').id, 'minimax-api');
+  const catalog = await adapter.listModels('minimax-api');
   assert.deepEqual(catalog.map(x => x.id), ['MiniMax-M3.1-Flash']);
   const user = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Use probe then reply.' }] });
-  const base = { provider: 'minimax-byapi', model: 'MiniMax-M3.1-Flash', messages: [user], tools: [{ name: 'probe', description: 'A test tool', parameters: { type: 'object', properties: {}, required: [] } }], maxTokens: 64 };
+  const base = { provider: 'minimax-api', model: 'MiniMax-M3.1-Flash', messages: [user], tools: [{ name: 'probe', description: 'A test tool', parameters: { type: 'object', properties: {}, required: [] } }], maxTokens: 64 };
   const first = []; for await (const chunk of adapter.stream(base)) first.push(chunk);
   assert.match(JSON.stringify(first), /call_demo/);
-  const assistant = createAssistantMessage({ source: { provider: 'minimax-byapi', model: 'MiniMax-M3.1-Flash' }, content: [{ type: 'tool-call', id: 'call_demo', name: 'probe', arguments: '{}' }] });
+  const assistant = createAssistantMessage({ source: { provider: 'minimax-api', model: 'MiniMax-M3.1-Flash' }, content: [{ type: 'tool-call', id: 'call_demo', name: 'probe', arguments: '{}' }] });
   const tool = createToolResultMessage({ callId: 'call_demo', content: [{ type: 'text', text: 'probe succeeded' }], isError: false });
   const second = []; for await (const chunk of adapter.stream({ ...base, messages: [user, assistant, tool] })) second.push(chunk);
   assert.match(JSON.stringify(second), /ROUNDTRIP_OK/);
@@ -70,7 +70,7 @@ test('文本参数下发：思考档位走 reasoning_effort，输出上限走 ma
     compat: { thinkingFormat: 'openai', maxTokensField: 'max_completion_tokens' },
   });
   const user = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'hi' }] });
-  const stream = async options => { const chunks = []; for await (const chunk of adapter.stream({ provider: 'minimax-byapi', model: 'MiniMax-M3.1-Flash', messages: [user], maxTokens: 4096, ...options })) chunks.push(chunk); return chunks; };
+  const stream = async options => { const chunks = []; for await (const chunk of adapter.stream({ provider: 'minimax-api', model: 'MiniMax-M3.1-Flash', messages: [user], maxTokens: 4096, ...options })) chunks.push(chunk); return chunks; };
 
   await stream({ reasoningEffort: 'max' });
   const body = requests.at(-1);
@@ -116,7 +116,7 @@ test('Anthropic 兼容通道：只发 thinking adaptive + output_config.effort�
   });
   const user = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'hi' }] });
   const chunks = [];
-  for await (const chunk of adapter.stream({ provider: 'minimax-byapi', model: 'MiniMax-M3.1-Flash', messages: [user], maxTokens: 4096, reasoningEffort: 'max' })) chunks.push(chunk);
+  for await (const chunk of adapter.stream({ provider: 'minimax-api', model: 'MiniMax-M3.1-Flash', messages: [user], maxTokens: 4096, reasoningEffort: 'max' })) chunks.push(chunk);
   assert.equal(requests.length, 1);
   const { path, body, auth, apiKey } = requests[0];
   // Anthropic SDK 会附加 ?beta=true；端点路径本身必须是 MiniMax 的 /anthropic/v1/messages。
@@ -137,9 +137,9 @@ test('Responses 不带 Chat Completions 的兼容字段，否则模型列表是�
   const ctx = { fiber: {}, logger: console, get: name => name === 'credentials' ? credentials : undefined };
   const models = [{ id: 'MiniMax-M3.1-Flash', contextWindow: 1000000, maxTokens: 131072, input: ['text'] }];
   const dropped = buildChatAdapter(ctx, { api: 'openai-responses', baseURL: 'http://127.0.0.1:8317/v1', apiKeyEnv: 'TEST_MINIMAX_KEY', models, compat: { thinkingFormat: 'openai', maxTokensField: 'max_completion_tokens' } });
-  assert.deepEqual(await dropped.listModels('minimax-byapi'), []);
+  assert.deepEqual(await dropped.listModels('minimax-api'), []);
   const kept = buildChatAdapter(ctx, { api: 'openai-responses', baseURL: 'http://127.0.0.1:8317/v1', apiKeyEnv: 'TEST_MINIMAX_KEY', models, compat: {} });
-  assert.deepEqual((await kept.listModels('minimax-byapi')).map(model => model.id), ['MiniMax-M3.1-Flash']);
+  assert.deepEqual((await kept.listModels('minimax-api')).map(model => model.id), ['MiniMax-M3.1-Flash']);
 });
 
 test('作用域必须能应答宿主的请求头水位线，否则请求阶段才会失败', () => {
@@ -152,7 +152,7 @@ test('作用域必须能应答宿主的请求头水位线，否则请求阶段�
   };
   const scope = createAdapterScope(ctx, () => {});
   const headers = new Headers({ 'x-probe': 'yes' });
-  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-byapi' }, headers, () => headers);
+  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-api' }, headers, () => headers);
   assert.equal(calls.length, 1, '水位线必须交给宿主，而不是被作用域吞掉');
   assert.equal(calls[0].name, 'llm-pi-ai/request-headers');
   assert.equal(result.get('x-probe'), 'yes');
@@ -161,7 +161,7 @@ test('作用域必须能应答宿主的请求头水位线，否则请求阶段�
 test('宿主没有请求头水位线时，作用域仍要返回交给它的标头', () => {
   const scope = createAdapterScope({ fiber: {}, logger: console, get: () => undefined }, () => {});
   const headers = new Headers({ 'x-probe': 'yes' });
-  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-byapi' }, headers, () => headers);
+  const result = scope.waterfall('llm-pi-ai/request-headers', { provider: 'minimax-api' }, headers, () => headers);
   assert.equal(result, headers);
 });
 
@@ -174,7 +174,7 @@ test('作用域要把未声明的宿主成员转发出去，官方适配器新�
 test('注册入口保持隔离：官方适配器注册的路由被捕获，宿主的适配器与设置不被改动', () => {
   let captured;
   const scope = createAdapterScope({ fiber: {}, logger: console, get: () => undefined }, value => { captured = value; });
-  const disposer = scope.llm.registerAdapter(['minimax-byapi'], { id: 'captured' });
+  const disposer = scope.llm.registerAdapter(['minimax-api'], { id: 'captured' });
   assert.equal(captured.id, 'captured');
   assert.equal(typeof disposer, 'function');
   assert.equal(typeof scope.llm.registerConfigurableProviders().replace, 'function');

@@ -1,27 +1,29 @@
-# dsh-minimax-byapi
+# dsh-minimax-api
 
-为 DeepSeek Harness 接入原生 MiniMax：既可以用订阅 Key（M Plan）也可以用按量付费 API Key 对话，并提供基于官方 MiniMax API 的生图、视频、语音、语音转文字与音乐工具。
+为 DeepSeek Harness 接入原生 MiniMax：既可以用订阅 Key（M Plan）也可以用按量付费 API Key 对话，还能通过官方 MiniMax API 使用生图、视频、语音与语音转文字工具，并在侧栏查看 M Plan 用量。
 
-[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-byapi.svg)](https://www.npmjs.com/package/dsh-minimax-byapi) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#兼容性与限制) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#兼容性与限制) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+[![CI](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml/badge.svg)](https://github.com/NingYuanLee/dsh-minimax-byapi/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dsh-minimax-api.svg)](https://www.npmjs.com/package/dsh-minimax-api) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#兼容性与限制) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#兼容性与限制) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 [English](README.md) | 中文
 
-> **已发布到 npm。** `dsh plugin add dsh-minimax-byapi` 安装已发布的包；git clone 或本地目录同样可用 —— 见[安装](#安装)。
+> **已发布到 npm。** `dsh plugin add dsh-minimax-api` 安装已发布的包；git clone 或本地目录同样可用 —— 见[安装](#安装)。
 
-一个插件，一条 MiniMax 连接。对话模型出现在模型选择器里；图片、视频、语音、音乐模型不进入选择器，而是通过工具调用。任何对话模型 —— MiniMax 或其他厂商 —— 都能调用这些工具。插件只访问 MiniMax 官方开放平台，把 API Key 存在 dsh 凭据服务里，生成的媒体保存在本地。它不是 OAuth 客户端，不提供账号与配额，也不读取任何 MiniMax 命令行令牌。
+一个插件，一条 MiniMax 连接。对话模型出现在模型选择器里；图片、视频、语音、音乐模型不进入选择器，而是通过工具调用。任何对话模型 —— MiniMax 或其他厂商 —— 都能调用这些工具。插件只访问 MiniMax 官方开放平台，把 API Key 存在 dsh 凭据服务里，生成的媒体保存在本地。侧栏底部的 MiniMax 行显示 5 小时窗口与周窗口的已用比例，`设置 → MiniMax API` 标签页可以集中修改连接、语言模型与媒体模型。它不是 OAuth 客户端，不签发凭据、也不发放额度，且不读取任何 MiniMax 命令行令牌。
 
 ## 能力概览
 
 | 方面 | 当前范围 |
 | --- | --- |
-| 对话提供方 | 注册原生 dsh LLM 提供方：路由 `minimax-byapi`，显示名 **MiniMax**。流式文本与工具调用走官方 pi-ai 适配器，可选 OpenAI 兼容或 Anthropic 兼容通道。 |
+| 对话提供方 | 注册原生 dsh LLM 提供方：路由 `minimax-api`，显示名 **MiniMax**。流式文本与工具调用走官方 pi-ai 适配器，可选 OpenAI 兼容或 Anthropic 兼容通道。 |
 | 模型清单 | `GET {root}/v1/models` 发现，与插件内置的模型常量合并，自动分类为 chat / image / video / speech / music / research / unknown。只有对话模型进入选择器。支持按模型覆盖。 |
 | 接入方式 | 五种：按量付费（国际 / 国内）与 M Plan 订阅（国际 / 国内），以及自定义地址。切换预设会同时填好 API 地址与对话协议。 |
-| 设置页 | 接入方式、API 地址、API Key、密钥自检、超时、对话模型表（模型选择器的唯一来源）与媒体模型选择。文案跟随 dsh 语言（英文或中文）。 |
+| 设置页 | 接入方式、API 地址、API Key、密钥自检、超时、语言模型表（模型选择器的唯一来源），以及单独的图片、视频、语音模型分区。同一张表单也可从 `设置 → MiniMax API` 打开。文案跟随 dsh 语言（英文或中文）。 |
+| 侧栏用量 | 侧栏底部有 MiniMax 行，直接显示 5 小时窗口与周窗口的已用比例；点开面板可看已用/总量与重置倒计时。每分钟联网刷新一次。按量付费 Key 没有 M Plan 额度，该行会自动隐藏。 |
+| 连接探测 | 打开「模型」页时在宿主侧用已保存的 Key 请求一次 `GET /v1/models`，只在插件标签后显示一个灰/绿/红圆点；悬停可看延迟或失败原因，Key 不会进入浏览器。 |
 | 媒体任务持久化 | 媒体任务按会话隔离，重启后仍在。下载先写 `.part` 临时文件再改名。下载失败可以只重试下载，不重新生成，不会重复计费。 |
 | 结果呈现 | 工具结果卡片、文件预览，以及 MP4 / MP3 / WAV 的侧栏播放器。卡片与播放器跟随 dsh 语言。 |
 
-插件注册两个组件：`minimax-byapi`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 13 个工具：
+插件注册两个组件：`minimax-api`（对话、模型清单、设置页）与 `dsh-minimax-media`（媒体工具），合计 13 个工具：
 
 | 工具 | 作用 |
 | --- | --- |
@@ -95,10 +97,12 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 - 上游没有公开字段表。实测（订阅 Key）返回的结构是：窗口数据在 `model_remains[]` 里（每项一个模型），剩余比例由 `current_interval_remaining_percent` / `current_weekly_remaining_percent` 直接给出，计数在该格式下为 0。插件按这套实测结构解析；多个模型时取最紧的那个窗口。早期那种「计数在顶层、`current_*_usage_count` 是剩余」的形状仍作为回退支持。最终以 MiniMax 控制台用量页为准。
 - 额度按需读取，不做轮询也不缓存。
 
-**左侧边栏的余额**：侧栏底部会显示一条 MiniMax 余额——展开时显示 5 小时窗口的剩余百分比，点开是两个窗口的余量、剩余量与重置时间，组件每 5 分钟自己刷新一次，也可以手动刷新。
+**左侧边栏的用量**：侧栏底部会显示一条 MiniMax 用量——不用点开就能同时看到 5 小时与周限额的已用百分比，点开是两个限额的已用量、已用百分比与还有多久重置，组件每分钟联网刷新一次，也可以手动刷新。
+
+**设置弹窗里的 MiniMax 页签**：`设置 → MiniMax API` 打开同一份连接、语言模型与媒体配置（与插件详情页共用）；模型行保持单行表格、列宽不够时横向滚动；删除按钮是图标，不占文字宽度。
 
 - 查询需要 API Key，而密钥只存在 dsh 凭据库里、值不过网，所以查询在宿主进程里执行，网页端只调宿主的 `/api/minimaxQuota/quota`。
-- 按量付费 Key 本来就没有 M Plan 额度，这种情况下这条余额不显示，而不是报错占位。
+- 按量付费 Key 本来就没有 M Plan 额度，这种情况下这条用量不显示，而不是报错占位。
 
 ## 安装
 
@@ -106,7 +110,7 @@ MiniMax 签发两类凭据，插件在协议层把它们同等对待：
 
 ```powershell
 dsh --profile minimax-test --from-default-profile web --dump-config
-dsh plugin --profile minimax-test add dsh-minimax-byapi
+dsh plugin --profile minimax-test add dsh-minimax-api
 ```
 
 **从 git 安装：**
@@ -141,13 +145,13 @@ dsh --profile minimax-test --no-open
 git 安装的更新方式是先移除再添加新提交；本地目录安装用 `git pull` 加 `npm install --ignore-scripts`；npm 安装在移除并重新添加插件后取到新版本。之后重启 dsh。
 
 ```powershell
-dsh plugin --profile minimax-test remove dsh-minimax-byapi
+dsh plugin --profile minimax-test remove dsh-minimax-api
 ```
 
 卸载会把插件的各层从 profile 中移除：提供方、13 个工具和设置页都会消失。但**已生成的媒体与任务记录不会被删除，凭据也不会被删除**。要清掉文件请自行删除数据目录：
 
 ```powershell
-Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
+Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-api"
 ```
 
 不再需要的话，请一并删除 dsh 中的凭据。
@@ -157,8 +161,8 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
 常规设置请用插件设置页。也可以在 profile 的 `cordis.patch.yml` 里手写配置，但并非必需：
 
 ```yaml
-- id: minimax-byapi
-  name: dsh-minimax-byapi
+- id: minimax-api
+  name: dsh-minimax-api
   config:
     connection:
       plan: coding-cn
@@ -188,7 +192,7 @@ Remove-Item -Recurse -Force "$env:DSH_HOME\plugins\dsh-minimax-byapi"
 | `media.videoModel` | 空 | 调用未指定 `model` 时使用的视频模型。 |
 | `media.speechModel` | 空 | 调用未指定 `model` 时使用的语音合成模型。 |
 | `media.musicModel` | 空 | 调用未指定 `model` 时使用的音乐模型。官方已退役，只有存量付费账号可调用。 |
-| `media.dataDir` | 空 | 媒体输出目录；留空表示 `$DSH_HOME/plugins/dsh-minimax-byapi`。 |
+| `media.dataDir` | 空 | 媒体输出目录；留空表示 `$DSH_HOME/plugins/dsh-minimax-api`。 |
 | `modelOverrides` | `[]` | 设置页写入的按模型覆盖项：类别、显示名、图片支持、上下文长度、最大输出、思考等级。下次刷新时生效。 |
 
 `connection`、`media` 与 `modelOverrides` 是 volatile 配置段：保存后 dsh 会重新加载插件层并重新发现模型清单。
@@ -235,7 +239,7 @@ MiniMax 的文本参数由插件映射到 dsh 本来就负责这些参数的位�
 | 语音转文字 | `asr-1.0` |
 | 音乐 | `music-3.0`、`music-2.6`、`music-cover` —— 已退役，见下 |
 
-设置页的每个媒体模型下拉下方都会显示当前所选模型的一行简介，选项本身也带同样的悬浮提示。生图支持的宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01` 支持），`prompt` 不超过 1500 字，`n` 取值 1–9。`image-01` 还支持显式的 `width`/`height`（512–2048 像素、8 的倍数，必须成对）；同时给出时插件以显式宽高为准、不再下发宽高比（官方规则是两者同给时以宽高比为准、会忽略宽高）。`image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。图生图通过 `subject_reference` 传参考图（人物主体参考：公网 URL 或 `data:image/jpeg;base64,…` Data URL，JPG/JPEG/PNG 且小于 10MB）。
+设置页的每个媒体模型卡片都会在下拉下方显示当前所选模型的一行简介，下拉选项里也直接带同样的简介。生图支持的宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01` 支持），`prompt` 不超过 1500 字，`n` 取值 1–9。`image-01` 还支持显式的 `width`/`height`（512–2048 像素、8 的倍数，必须成对）；同时给出时插件以显式宽高为准、不再下发宽高比（官方规则是两者同给时以宽高比为准、会忽略宽高）。`image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。图生图通过 `subject_reference` 传参考图（人物主体参考：公网 URL 或 `data:image/jpeg;base64,…` Data URL，JPG/JPEG/PNG 且小于 10MB）。
 
 视频生成是三步异步流程：创建任务、查询任务、下载文件。插件会保留任务 id，因此 `minimax_media_status` 能在不重复提交的前提下取回成片。
 
@@ -247,7 +251,7 @@ MiniMax 已退役音乐模型，并且自 **2026-08-20** 起音乐 API 不再向
 
 - **网络：** 只访问你配置的 MiniMax 端点。发现调用 `GET {root}/v1/models`，对话走所选通道，媒体工具调用同一主机下的生图、视频、语音、语音转文字与音乐接口。没有遥测、没有分析统计、没有第三方服务。
 - **凭据：** Key 存在 dsh 凭据服务中，引用名 `MINIMAX_API_KEY`；不会写进 YAML、日志、任务记录或仓库。媒体下载请求发往 MiniMax 自家的文件域名，不携带额外凭据。
-- **文件：** 生成的媒体写入 `$DSH_HOME/plugins/dsh-minimax-byapi`（或 `media.dataDir`）。任务记录里可能含有时效性的上游地址，请按私密信息对待。
+- **文件：** 生成的媒体写入 `$DSH_HOME/plugins/dsh-minimax-api`（或 `media.dataDir`）。任务记录里可能含有时效性的上游地址，请按私密信息对待。
 - **数据出境：** 你在提示词里写的提示词、附带的参考图、用于转写的音频、要合成的文本，都会原样发给 MiniMax 处理。插件不做过滤、脱敏或二次托管。
 - **本插件不做的事：** 读取或复用 MiniMax 命令行令牌、安装或运行其他插件、安装时拉取运行时依赖、调用服务端联网搜索工具、语音克隆与声音设计。
 
@@ -265,10 +269,10 @@ MiniMax 已退役音乐模型，并且自 **2026-08-20** 起音乐 API 不再向
 
 以下四项全部通过即安装成功：
 
-1. `dsh --profile minimax-test --dump-config` 列出 `minimax-byapi` 层。
-2. 插件页显示本插件的两个组件（`minimax-byapi` 与 `dsh-minimax-media`）均为运行中。
+1. `dsh --profile minimax-test --dump-config` 列出 `minimax-api` 层。
+2. 插件页显示本插件的两个组件（`minimax-api` 与 `dsh-minimax-media`）均为运行中。
 3. `minimax_models` 返回分类后的模型 ID。
-4. 执行 `dsh plugin --profile minimax-test remove dsh-minimax-byapi` 后，各层与组件消失。
+4. 执行 `dsh plugin --profile minimax-test remove dsh-minimax-api` 后，各层与组件消失。
 
 | 现象 | 处理 |
 | --- | --- |
@@ -300,10 +304,10 @@ CI（`.github/workflows/ci.yml`）在 Linux 与 Windows 上以 Node 22.19 与 24
 trusted publishing 需要为该包登记一次。用 npm CLI 11.16 及以上版本可以直接在命令行登记（需先登录 npm）：
 
 ```bash
-npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
+npm trust github dsh-minimax-api --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish
 ```
 
-`--file` 只写 workflow 文件名，`--repo` 写 `owner/repo`，`--allow-publish` 表示允许该 trusted publisher 执行 `npm publish`（`npm stage publish` 始终允许）。也可以在 npmjs.com 网页上登记：**Packages → `dsh-minimax-byapi` → Settings → Trusted publishing**
+`--file` 只写 workflow 文件名，`--repo` 写 `owner/repo`，`--allow-publish` 表示允许该 trusted publisher 执行 `npm publish`（`npm stage publish` 始终允许）。也可以在 npmjs.com 网页上登记：**Packages → `dsh-minimax-api` → Settings → Trusted publishing**
 
 | 字段 | 填写内容 |
 | --- | --- |
@@ -332,4 +336,4 @@ npm publish --otp <code>    # <code> 是验证器里的 6 位一次性验证码
 - Bug 与功能请求：[Issues](https://github.com/NingYuanLee/dsh-minimax-byapi/issues)（仓库自带 bug 报告与功能请求模板）。
 - 安全问题：[SECURITY.md](SECURITY.md) —— 请使用 GitHub 私密漏洞报告。
 - 许可：[MIT](LICENSE)。版权所有 (c) 2026 NingYuanLee。
-- 仓库：<https://github.com/NingYuanLee/dsh-minimax-byapi>。这是社区插件项目，不是 DeepSeek 或 MiniMax 的官方产品。“ByAPI” 指插件通过官方 API 用你自己的 Key 访问 MiniMax，并不等于实现了 MiniMax 的全部产品能力。
+- 仓库：<https://github.com/NingYuanLee/dsh-minimax-byapi>。这是社区插件项目，不是 DeepSeek 或 MiniMax 的官方产品。“API接入” 指插件通过官方 API 用你自己的 Key 访问 MiniMax，并不等于实现了 MiniMax 的全部产品能力。

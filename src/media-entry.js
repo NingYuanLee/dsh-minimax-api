@@ -1,8 +1,8 @@
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
 export const name = 'MiniMax Media';
-export const packageName = 'dsh-minimax-byapi';
-export const inject = ['minimax-byapi', 'tools'];
+export const packageName = 'dsh-minimax-api';
+export const inject = ['minimax-api', 'tools'];
 
 const ownerOf = exec => {
   const owner = exec.agent?.session?.id;
@@ -12,8 +12,8 @@ const ownerOf = exec => {
 const jsonOutput = { schema: { type: 'json' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 
 export async function apply(ctx) {
-  const runtime = ctx['minimax-byapi']?.runtime || ctx.get('minimax-byapi')?.runtime;
-  if (!runtime) throw new Error('MiniMax Media 需要先启用 MiniMax ByAPI');
+  const runtime = ctx['minimax-api']?.runtime || ctx.get('minimax-api')?.runtime;
+  if (!runtime) throw new Error('MiniMax Media 需要先启用 MiniMax API Access');
   const signalOf = exec => AbortSignal.any([exec.signal, runtime.abort?.signal].filter(Boolean));
   const disposers = [];
   const factories = [];

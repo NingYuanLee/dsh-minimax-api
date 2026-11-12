@@ -1,5 +1,5 @@
 - insert:
-    - id: minimax-byapi
-      name: dsh-minimax-byapi
+    - id: minimax-api
+      name: dsh-minimax-api
     - id: dsh-minimax-media
-      name: dsh-minimax-byapi/media
+      name: dsh-minimax-api/media

@@ -63,7 +63,7 @@ export function createAdapterScope(ctx, onAdapter) {
 // No global fetch, shared settings, sibling adapter or OAuth record is modified.
 export function buildChatAdapter(ctx, profile) {
   let adapter;
-  applyPiAi(createAdapterScope(ctx, value => { adapter = value; }), PiAiConfig({ providers: { 'minimax-byapi': profile } }));
+  applyPiAi(createAdapterScope(ctx, value => { adapter = value; }), PiAiConfig({ providers: { 'minimax-api': profile } }));
   if (!adapter) throw new Error('官方适配器未能创建 MiniMax 路由；请检查 dsh 兼容版本');
   return adapter;
 }

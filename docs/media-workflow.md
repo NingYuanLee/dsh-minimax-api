@@ -17,7 +17,7 @@
 | `minimax_media_status` | 查询任务状态并取回结果 | 查询 + 下载 |
 | `minimax_media_retry_download` | 只重试下载 | 下载 |
 | `minimax_media_list` | 列出本会话的媒体任务 | 本地记录 |
-| `minimax_models` | 刷新模型清单（`minimax-byapi` 组件） | `GET {root}/v1/models` |
+| `minimax_models` | 刷新模型清单（`minimax-api` 组件） | `GET {root}/v1/models` |
 
 媒体工具与当前对话模型无关：任何聊天模型都能调用它们，不要求当前会话正在用 MiniMax 对话。
 
@@ -68,10 +68,10 @@ v2 的画幅规则：文生视频（只含文本）必须给具体比例，不�
 ## 任务记录与落盘
 
 - 媒体任务**按会话隔离**并持久化到磁盘：进程重启后任务仍在，可以继续用 `minimax_media_status` 取回结果。
-- 任务记录保存在 `media.dataDir`（默认 `$DSH_HOME/plugins/dsh-minimax-byapi`），按连接再分目录隔离，避免把不同端点的远端任务 id 混在一起。
+- 任务记录保存在 `media.dataDir`（默认 `$DSH_HOME/plugins/dsh-minimax-api`），按连接再分目录隔离，避免把不同端点的远端任务 id 混在一起。
 - 下载先写 `.part` 临时文件，校验通过后再改名成最终文件，因此不会把半截文件当成成品交付。
 - `minimax_media_retry_download` **只重试下载**，不会重新生成，因此不会重复计费；如果没有可下载的结果，它会拒绝而不是重新生成。
-- 卸载插件不会删除这些文件，需要时自行清理 `$DSH_HOME/plugins/dsh-minimax-byapi`。
+- 卸载插件不会删除这些文件，需要时自行清理 `$DSH_HOME/plugins/dsh-minimax-api`。
 
 ## 参考来源
 
