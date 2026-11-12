@@ -273,9 +273,19 @@ test('apply 注册字典并把 locale 传给每个槽位，documentPreview 标�
   assert.deepEqual(Object.keys(dictionaries[0].dicts.en).sort(), Object.keys(Client.exports.en).sort());
   assert.ok(Client.exports.inject.includes('locale'), 'inject 声明 locale 服务');
 
-  assert.equal(registered.length, 17, '插件配置 + 两个组件能力页 + 十三个工具卡片 + 媒体侧栏');
+  assert.equal(registered.length, 18, '插件配置 + 两个组件能力页 + 十三个工具卡片 + 媒体侧栏 + 余额组件');
   for (const { options } of registered) assert.equal(options.locale, 'minimaxByapi', options.name + ' 声明 locale');
   assert.ok(registered.some(entry => entry.options.name === 'plugins.bundle.config'));
+  // 侧栏底部是 list 槽位：契约要求 id，用 key 会注册失败并让整个客户端条目卡在 loading。
+  const footer = registered.find(entry => entry.options.name === 'sidebar.footer.action');
+  assert.ok(footer, '注册了侧栏余额组件');
+  assert.equal(footer.options.id, 'dsh-minimax-byapi/quota', 'list 槽位按契约用 id 注册');
+  assert.equal('key' in footer.options, false, 'list 槽位不接受 key');
+  // 其余四个槽位是 keyed 槽位，仍用 key。
+  for (const entry of registered) {
+    if (entry.options.name === 'sidebar.footer.action') continue;
+    assert.equal('id' in entry.options, false, entry.options.name + ' 是 keyed 槽位');
+  }
   assert.equal(previewOptions.title(), 'MiniMax media player');
 });
 
@@ -290,7 +300,7 @@ test('旧宿主没有 ctx.locale 时 apply 不崩，槽位不带 locale 且标�
     effect: fn => fn(),
   };
   assert.doesNotThrow(() => Client.exports.apply(ctx));
-  assert.equal(registered.length, 17);
+  assert.equal(registered.length, 18);
   for (const options of registered) assert.equal('locale' in options, false, '旧宿主不传 locale');
   assert.equal(previewOptions.title(), 'MiniMax 媒体播放');
 });

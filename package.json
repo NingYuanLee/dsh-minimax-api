@@ -36,7 +36,7 @@
     "build": "node scripts/build-client.mjs",
     "prepack": "npm run build",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/index.js && node --check src/adapter.js && node --check src/catalog.js && node --check src/lock.js && node --check src/media.js && node --check src/media-entry.js && node --check src/minimax-api.js && node --check src/service.js && node --check src/client.js && node --check scripts/build-client.mjs",
+    "check": "node --check src/index.js && node --check src/quota-service.js && node --check src/adapter.js && node --check src/catalog.js && node --check src/lock.js && node --check src/media.js && node --check src/media-entry.js && node --check src/minimax-api.js && node --check src/service.js && node --check src/client.js && node --check scripts/build-client.mjs",
     "prepublishOnly": "npm test && npm run check"
   },
   "engines": {
@@ -82,6 +82,7 @@
         "@deepseek-ai/dsh-client-ui-tool",
         "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-api-settings-controller"
       ],
       "platform": "web"

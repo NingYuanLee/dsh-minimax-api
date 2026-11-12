@@ -92,8 +92,13 @@ The settings page defaults to **`coding-cn` with `anthropic-messages`**, so a fr
 
 - **Subscription key only.** A pay-as-you-go key is refused by the service; the tool reports that instead of failing silently.
 - Text, image, audio and other non-video capabilities are limited by both windows; video models are limited by the weekly window only, and unused quota does not carry over.
-- The response field names are not documented upstream: `current_*_usage_count` is reported by MiniMax issue trackers as returning *remaining*, not used. The plugin reads it as remaining and falls back to treating it as used when the number exceeds the total. Treat the MiniMax console usage page as authoritative.
+- The response field names are not documented upstream. The live answer (subscription key, measured) keeps the window data inside `model_remains[]` with one entry per model and reports the remaining share as `current_interval_remaining_percent` / `current_weekly_remaining_percent`; the counters are zero in that shape. The plugin reads that shape, and when several models are listed the tightest window wins. The older counter-shaped answer (top-level `current_*_usage_count`, reported by MiniMax issue trackers as *remaining* rather than used) is still parsed as a fallback. Treat the MiniMax console usage page as authoritative.
 - The quota is read on demand, never polled or cached.
+
+**Balance in the left sidebar.** The sidebar foot carries a MiniMax balance row: the 5-hour window's remaining percentage shows inline, and clicking it opens a panel with both windows, the remaining counts and the reset times. The widget refreshes itself every five minutes and can be refreshed by hand.
+
+- Querying needs the API key, and keys stay in the dsh credential store and never cross the wire, so the query runs in the host process and the web client calls the host over `/api/minimaxQuota/quota`.
+- A pay-as-you-go key has no M Plan quota at all, so the row hides itself instead of showing an error.
 
 ## Install
 

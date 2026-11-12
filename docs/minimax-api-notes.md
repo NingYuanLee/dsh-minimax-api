@@ -88,6 +88,13 @@ predates the current API and is now obsolete.)
   `2056` (usage limit exceeded), `2069` (model no longer available) are M-Plan-specific.
 - Usage query endpoint (note: on the **www** host, not the API host):
   `curl 'https://www.minimax.io/v1/token_plan/remains' -H 'Authorization: Bearer <M Plan API key>'`
+- Measured response shape (2026-11, M Plan subscription key, China host `www.minimax.cn`): the window data sits
+  inside `model_remains[]` (one entry per model, e.g. `general`), the remaining share is reported directly as
+  `current_interval_remaining_percent` / `current_weekly_remaining_percent`, the counters
+  (`current_interval_total_count`, `current_interval_usage_count`, weekly equivalents) are `0`, and the reset
+  times are epoch milliseconds (`end_time`, `weekly_end_time`) with `remains_time` / `weekly_remains_time` as
+  countdowns. The international host `www.minimax.io` rejects the same key with `status_code 2049`, so the host
+  follows the configured API host (`www.minimax.cn` / `www.minimaxi.com` for China).
 - Error `2057` = "not token plan token — Please call this endpoint with your M Plan Subscription Key" (i.e. some
   endpoints require the subscription key specifically). Error `2061` = "your current token plan not support model".
 

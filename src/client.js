@@ -173,6 +173,16 @@ export const zh = {
   'settings.save.needModels': '先点「获取模型」，或先选择一条对话模型。',
   'settings.save.chatCount': '已保存 {count} 条对话模型。',
   'settings.save.mediaDone': '媒体模型已保存。',
+  'quota.title': 'MiniMax 余额',
+  'quota.remaining': '剩余 {percent}%',
+  'quota.window5h': '5 小时窗口',
+  'quota.windowWeekly': '周窗口',
+  'quota.resetAt': '{time} 重置',
+  'quota.refresh': '刷新',
+  'quota.loading': '正在查询额度…',
+  'quota.unavailable': '额度不可用',
+  'quota.remainingOf': '剩余 {remaining} / {total}',
+  'quota.unknown': '暂无数据',
   'error.unknown': '未知错误',
 };
 
@@ -338,6 +348,16 @@ export const en = {
   'settings.save.needModels': 'Click "Get models" first, or select a chat model first.',
   'settings.save.chatCount': 'Saved {count} chat models.',
   'settings.save.mediaDone': 'Media models saved.',
+  'quota.title': 'MiniMax balance',
+  'quota.remaining': '{percent}% left',
+  'quota.window5h': '5-hour window',
+  'quota.windowWeekly': 'Weekly window',
+  'quota.resetAt': 'Resets {time}',
+  'quota.refresh': 'Refresh',
+  'quota.loading': 'Checking quota…',
+  'quota.unavailable': 'Quota unavailable',
+  'quota.remainingOf': '{remaining} of {total} left',
+  'quota.unknown': 'No data',
   'error.unknown': 'Unknown error',
 };
 
@@ -357,6 +377,8 @@ const zhT = createT(zh);
 export const inject = ['slots', 'documentPreviews', 'remote', 'remote.llm', 'remote.settings', 'remote.credentials', 'locale'];
 const h = React.createElement;
 const MEDIA_ID = 'dsh-minimax-byapi/media-preview';
+// 侧栏余额组件的槽位 key（同一插槽下的唯一标识）。
+const QUOTA_ID = 'dsh-minimax-byapi/quota';
 // 设置命名空间 = MiniMax ByAPI 这一行在 profile 里的实例 id（cordis.patch.yml 的 - id:）。
 const SETTINGS_NS = 'minimax-byapi';
 // 包名 = 插件管理器里「插件包」那一行的标识，槽位 key 用的是它
@@ -1078,6 +1100,194 @@ function capabilityView(keys, summaryKey) {
         ...keys.map(key => h('li', { key, style: { whiteSpace: 'pre-wrap' } }, t(key)))));
   };
 }
+// ── 侧栏余额组件 ────────────────────────────────────────────────────────────
+// 额度查询需要 API Key，而密钥只存在 dsh 凭据库里、值不过网，所以查询必须留在宿主：
+// 前端调用宿主暴露的 /api/minimaxQuota/quota（Typert 网关把宿主 Service 转成 HTTP 端点）。
+const QUOTA_NAMESPACE = 'minimaxQuota';
+const QUOTA_ENDPOINT = QUOTA_NAMESPACE + '/quota';
+// 5 小时窗口变化快，5 分钟自己刷一次；周窗口跟着同一次请求一起更新。
+const QUOTA_REFRESH_MS = 5 * 60 * 1000;
+
+/**
+ * 调用宿主的额度接口。
+ * @returns {Promise<object>} 宿主返回的额度快照（ok 为 false 时带 code 与 message）。
+ */
+async function quotaRequest() {
+  const rpcId = 'minimax-quota-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  const response = await fetch('/api/' + QUOTA_ENDPOINT, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', rpcId, method: QUOTA_ENDPOINT, payload: { args: {} } }),
+  });
+  if (!response.ok) throw new Error('HTTP ' + response.status);
+  const body = await response.json();
+  if (!body || body.type !== 'server-response' || !body.result) throw new Error('bad response');
+  if (body.result.ok === false) {
+    const error = new Error(body.result.error?.message || 'quota failed');
+    error.code = body.result.error?.code;
+    throw error;
+  }
+  return body.result.value;
+}
+
+/**
+ * 窗口的剩余百分比，夹在 0–100。
+ * @param {object} window 额度窗口。
+ * @returns {number|null} 百分比，或没有该数值时的 null。
+ */
+export function quotaPercent(window) {
+  const value = window?.percentRemaining;
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
+}
+
+/**
+ * 数字的本地化写法。
+ * @param {number|undefined} value 数值。
+ * @returns {string} 本地化数字，或占位符。
+ */
+function quotaNumber(value) {
+  return Number.isFinite(value) ? value.toLocaleString() : '—';
+}
+
+/**
+ * 重置时间的本地化写法；解析不了就原样返回。
+ * @param {string|undefined} value ISO 时间串。
+ * @returns {string} 本地化时间。
+ */
+function quotaTime(value) {
+  if (typeof value !== 'string' || !value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+const quotaStyles = {
+  root: { position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', minWidth: 0 },
+  row: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', minWidth: 0, padding: '6px 8px', margin: 0, font: 'inherit', fontSize: 12, lineHeight: 1.4, color: 'var(--dsw-alias-label-primary)', background: 'transparent', border: 0, borderRadius: 'var(--dsw-radius-sm, 8px)', cursor: 'pointer', textAlign: 'left' },
+  rowHover: { background: 'var(--dsw-alias-interactive-bg-hover, transparent)' },
+  railRow: { width: 36, height: 36, justifyContent: 'center', padding: 0 },
+  badge: { flex: 'none', width: 20, height: 20, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--dsw-alias-label-primary)', background: 'var(--dsw-alias-fill-l2, #8882)' },
+  name: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  value: { flex: 'none', color: 'var(--dsw-alias-label-secondary)' },
+  panel: { position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 20, width: 264, maxWidth: 'calc(100vw - 24px)', display: 'grid', gap: 10, padding: 12, border: 0, borderRadius: 'var(--dsw-radius-lg, 16px)', background: 'var(--dsw-alias-bg-layer-2, #fff)', boxShadow: 'var(--dsw-elevation-panel)', color: 'var(--dsw-alias-label-primary)' },
+  panelTitle: { margin: 0, fontSize: 12, fontWeight: 600 },
+  panelRow: { display: 'grid', gap: 4 },
+  panelLabel: { margin: 0, fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
+  panelMeta: { margin: 0, fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
+  track: { height: 4, borderRadius: 999, overflow: 'hidden', background: 'var(--dsw-alias-fill-l2, #8882)' },
+  fill: { display: 'block', height: '100%', borderRadius: 999, background: 'var(--dsw-alias-brand-primary, currentColor)' },
+  refresh: { justifySelf: 'start', padding: '4px 10px', font: 'inherit', fontSize: 11, color: 'var(--dsw-alias-label-primary)', background: 'var(--dsw-alias-bg-layer-1, transparent)', border: '0.5px solid var(--dsw-alias-border-l2, #8885)', borderRadius: 'var(--dsw-radius-sm, 8px)', cursor: 'pointer' },
+};
+
+/**
+ * 一个额度窗口的展示行：标题、进度条、剩余量与重置时间。
+ * @param {object} props 组件属性。
+ * @returns {object} React 元素。
+ */
+function QuotaWindowRow({ label, window, t }) {
+  const percent = quotaPercent(window);
+  const reset = quotaTime(window?.resetAt);
+  return h('div', { style: quotaStyles.panelRow },
+    h('p', { style: quotaStyles.panelLabel }, label),
+    h('div', { style: quotaStyles.track, 'aria-hidden': 'true' },
+      h('div', { style: { ...quotaStyles.fill, width: (percent === null ? 0 : percent) + '%' } })),
+    h('p', { style: quotaStyles.panelMeta },
+      percent === null ? t('quota.unknown') : t('quota.remaining', { percent: Math.round(percent) })),
+    Number.isFinite(window?.remaining) ? h('p', { style: quotaStyles.panelMeta }, t('quota.remainingOf', { remaining: quotaNumber(window.remaining), total: quotaNumber(window.total) })) : null,
+    reset ? h('p', { style: quotaStyles.panelMeta }, t('quota.resetAt', { time: reset })) : null);
+}
+
+/**
+ * 左侧栏底部的 MiniMax 余额组件。
+ * 展开态显示「MiniMax + 5 小时窗口剩余百分比」，收起态只剩一个图标；点击展开两个窗口的明细。
+ * 按量付费 Key 本来就没有 M Plan 额度，这种情况下组件不显示。
+ * @param {object} props 组件属性（wide 为侧栏是否展开，t 为翻译函数）。
+ * @returns {object|null} React 元素。
+ */
+export function MinimaxQuotaWidget({ wide, t = zhT }) {
+  const [state, setState] = useState({ status: 'loading', data: null, message: '' });
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const alive = useRef(true);
+  const loader = useRef(null);
+
+  const load = async () => {
+    try {
+      const value = await quotaRequest();
+      if (!alive.current) return;
+      if (!value || value.ok === false) {
+        const code = value?.code;
+        // 按量付费 Key 没有 M Plan 额度，自建地址也查不了：这两种情况不占侧栏位置。
+        if (code === 'subscription-required' || code === 'unsupported-host') {
+          setState({ status: 'hidden', data: null, message: '' });
+          return;
+        }
+        setState({ status: 'error', data: null, message: value?.message || '' });
+        return;
+      }
+      setState({ status: 'ready', data: value, message: '' });
+    } catch (error) {
+      if (!alive.current) return;
+      setState({ status: 'error', data: null, message: error?.message || '' });
+    }
+  };
+  loader.current = load;
+
+  useEffect(() => {
+    alive.current = true;
+    void load();
+    const timer = setInterval(() => { void loader.current?.(); }, QUOTA_REFRESH_MS);
+    return () => { alive.current = false; clearInterval(timer); };
+  }, []);
+
+  // 面板是浮层：点外面或按 Esc 收起来，焦点还在按钮上。
+  const root = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = event => {
+      const node = root.current;
+      if (node && event.target && node.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = event => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  if (state.status === 'hidden') return null;
+  const data = state.data;
+  const percent = quotaPercent(data?.interval5h);
+  const title = t('quota.title');
+  const summary = state.status === 'ready'
+    ? (percent === null ? t('quota.unknown') : t('quota.remaining', { percent: Math.round(percent) }))
+    : state.status === 'error' ? t('quota.unavailable') : t('quota.loading');
+  const rowStyle = { ...quotaStyles.row, ...(wide ? {} : quotaStyles.railRow), ...(hover ? quotaStyles.rowHover : {}) };
+  const button = h('button', {
+    type: 'button',
+    style: rowStyle,
+    'aria-label': title + ' · ' + summary,
+    'aria-expanded': open ? 'true' : 'false',
+    title: state.status === 'error' && state.message ? state.message : summary,
+    onClick: () => setOpen(value => !value),
+    onMouseEnter: () => setHover(true),
+    onMouseLeave: () => setHover(false),
+  },
+    h('span', { style: quotaStyles.badge, 'aria-hidden': 'true' }, 'M'),
+    wide ? h('span', { style: quotaStyles.name }, title) : null,
+    wide ? h('span', { style: quotaStyles.value }, summary) : null);
+  const panel = open ? h('div', { style: quotaStyles.panel, role: 'dialog', 'aria-label': title },
+    h('p', { style: quotaStyles.panelTitle }, title),
+    h(QuotaWindowRow, { label: t('quota.window5h'), window: data?.interval5h, t }),
+    h(QuotaWindowRow, { label: t('quota.windowWeekly'), window: data?.weekly, t }),
+    state.status === 'error' ? h('p', { role: 'alert', style: quotaStyles.panelMeta }, state.message || t('quota.unavailable')) : null,
+    h('button', { type: 'button', style: quotaStyles.refresh, onClick: () => { void load(); } }, t('quota.refresh'))) : null;
+  return h('div', { style: quotaStyles.root, ref: node => { root.current = node; } }, button, panel);
+}
+
 export function apply(ctx) {
   // 字典命名空间：官方 locale 服务可用时注册 zh/en，语言切换后槽位组件自动重渲染。
   if (typeof ctx.locale?.register === 'function') {
@@ -1096,4 +1306,6 @@ export function apply(ctx) {
   for (const key of tools) ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(slotOptions({ name: 'tool.call.toolview', key }), MinimaxToolCard));
   ctx.effect(() => ctx.documentPreviews.register({ id: MEDIA_ID, extensions: ['mp4', 'mp3', 'wav'], binaryExtensions: ['mp4', 'mp3', 'wav'], priority: 'extension', title: () => t('media.title'), loading: 'bytes-complete', wrap: false }));
   ctx.slots.inject('sidebar.right.tab.document', () => ctx.slots.register(slotOptions({ name: 'sidebar.right.tab.document', key: MEDIA_ID }), MediaPreview));
+  // 左侧栏底部：MiniMax 额度（余额）组件。数据来自宿主接口 /api/minimaxQuota/quota，密钥不过网。
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(slotOptions({ name: 'sidebar.footer.action', id: QUOTA_ID }), MinimaxQuotaWidget));
 }

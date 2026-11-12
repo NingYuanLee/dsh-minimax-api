@@ -367,9 +367,20 @@ export async function transcribeAudio({ apiRoot, apiKey, fetchImpl = fetch, sign
 
 // ── M Plan 额度 ────────────────────────────────────────────────────────────
 // 官方端点：GET https://www.minimax.io/v1/token_plan/remains（国内 www.minimax.cn），
-// 必须用订阅 Key；按量付费 Key 会被拒绝。官方文档没有公开返回字段表，
-// 社区实测（MiniMax-M2 issue #99）指出 current_*_usage_count 返回的是「剩余」而不是「已用」，
-// 所以这里按剩余解析，并在数值自相矛盾（usage > total）时回退成 total - usage。
+// 必须用订阅 Key；按量付费 Key 会被拒绝。官方文档没有公开返回字段表。
+//
+// 实测（2026-11，sk-cp 订阅 Key）返回的结构是：
+//   { model_remains: [ { model_name: "general",
+//       current_interval_total_count: 0, current_interval_usage_count: 0,
+//       current_interval_remaining_percent: 90,
+//       current_weekly_total_count: 0, current_weekly_usage_count: 0,
+//       current_weekly_remaining_percent: 7,
+//       end_time: <epoch ms>, weekly_end_time: <epoch ms>,
+//       remains_time: <ms>, weekly_remains_time: <ms> } ],
+//     base_resp: { status_code: 0, status_msg: "success" } }
+// 也就是：窗口数据在 model_remains[] 里（每项一个模型），百分比由 *_remaining_percent 直接给出，
+// 计数（total/usage）在这种格式下是 0。早期版本按「计数在顶层、usage 是剩余」解析，
+// 那种形状现在仍作为回退保留，但没有它时必须用百分比，否则界面只能显示「暂无数据」。
 
 export function quotaHostFor(apiRoot) {
   const host = new URL(normalizeApiRoot(apiRoot)).hostname;
@@ -380,7 +391,7 @@ function quotaWindow(total, usage, resetAt) {
   const t = Number(total), u = Number(usage);
   const reset = resetAt === undefined || resetAt === null ? undefined : resetAt;
   if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(u) || u < 0) return { total: undefined, remaining: undefined, used: undefined, percentRemaining: undefined, resetAt: reset };
-  // usage_count 语义：官方未公开字段表，社区实测为「剩余」；若它大于 total（不可能剩余），
+  // usage_count 语义：官方未公开字段表，早期实测为「剩余」；若它大于 total（不可能剩余），
   // 则按「已用」解读，此时剩余记 0。
   const remaining = u <= t ? u : 0;
   const used = u <= t ? t - u : u;
@@ -393,21 +404,66 @@ function quotaWindow(total, usage, resetAt) {
   };
 }
 
+/**
+ * epoch 毫秒转 ISO 时间串；解析不了就返回 undefined。
+ * @param {unknown} value epoch 毫秒。
+ * @returns {string|undefined} ISO 时间串。
+ */
+function epochToIso(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms <= 0) return undefined;
+  const date = new Date(ms);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/**
+ * 取一组窗口里最紧的那个：百分比取最小，重置时间取最早。
+ * @param {Array<object>} rows 归一化后的模型行。
+ * @param {string} percentKey 百分比字段名。
+ * @param {string} resetKey 重置时间字段名。
+ * @returns {object} 聚合后的百分比与重置时间。
+ */
+function tightest(rows, percentKey, resetKey) {
+  const percents = rows.map(row => row[percentKey]).filter(value => Number.isFinite(value));
+  const resets = rows.map(row => row[resetKey]).filter(value => typeof value === 'string').sort();
+  return {
+    percentRemaining: percents.length ? Math.min(...percents) : undefined,
+    resetAt: resets.length ? resets[0] : undefined,
+  };
+}
+
 export function normalizeQuota(payload) {
   const body = payload && typeof payload === 'object' ? payload : {};
   const data = body.data && typeof body.data === 'object' ? body.data : body;
   const pick = (...keys) => { for (const key of keys) { if (data[key] !== undefined && data[key] !== null) return data[key]; } return undefined; };
-  const remainsTime = Number(pick('remains_time'));
-  const models = (Array.isArray(data.model_remains) ? data.model_remains : []).map(row => ({
-    model: row?.model ?? row?.model_name,
+  const rows = Array.isArray(data.model_remains) ? data.model_remains : [];
+  const models = rows.map(row => ({
+    model: row?.model_name ?? row?.model,
     total: Number(row?.total) || undefined,
     remaining: Number(row?.remains) || undefined,
+    percentRemaining: Number.isFinite(Number(row?.current_interval_remaining_percent)) ? Number(row.current_interval_remaining_percent) : undefined,
+    weeklyPercentRemaining: Number.isFinite(Number(row?.current_weekly_remaining_percent)) ? Number(row.current_weekly_remaining_percent) : undefined,
+    intervalResetAt: epochToIso(row?.end_time),
+    weeklyResetAt: epochToIso(row?.weekly_end_time),
+    intervalRemainsTimeMs: Number.isFinite(Number(row?.remains_time)) ? Number(row.remains_time) : undefined,
+    weeklyRemainsTimeMs: Number.isFinite(Number(row?.weekly_remains_time)) ? Number(row.weekly_remains_time) : undefined,
   })).filter(row => typeof row.model === 'string' && row.model);
+  // 顶层计数是老形状；新形状的计数在 model_remains 里且是 0，所以两者都读，谁有值用谁。
+  const interval = quotaWindow(pick('current_interval_total_count'), pick('current_interval_usage_count'), pick('current_interval_reset_time'));
+  const weekly = quotaWindow(pick('current_weekly_total_count'), pick('current_weekly_usage_count'), pick('current_weekly_reset_time'));
+  const intervalPercent = tightest(models, 'percentRemaining', 'intervalResetAt');
+  const weeklyPercent = tightest(models, 'weeklyPercentRemaining', 'weeklyResetAt');
+  interval.percentRemaining = interval.percentRemaining ?? intervalPercent.percentRemaining;
+  interval.resetAt = interval.resetAt ?? intervalPercent.resetAt;
+  weekly.percentRemaining = weekly.percentRemaining ?? weeklyPercent.percentRemaining;
+  weekly.resetAt = weekly.resetAt ?? weeklyPercent.resetAt;
+  const remainsTime = Number(pick('remains_time'));
+  const intervalRemains = models.map(row => row.intervalRemainsTimeMs).filter(value => Number.isFinite(value));
   return {
-    interval5h: quotaWindow(pick('current_interval_total_count'), pick('current_interval_usage_count'), pick('current_interval_reset_time')),
-    weekly: quotaWindow(pick('current_weekly_total_count'), pick('current_weekly_usage_count'), pick('current_weekly_reset_time')),
-    // 5 小时窗口剩余毫秒数（社区实测这是实时倒计时，不是 token 计数）
-    remainsTimeMs: Number.isFinite(remainsTime) ? remainsTime : undefined,
+    interval5h: interval,
+    weekly,
+    // 5 小时窗口剩余毫秒数（实时倒计时，不是 token 计数）
+    remainsTimeMs: Number.isFinite(remainsTime) ? remainsTime : (intervalRemains.length ? Math.min(...intervalRemains) : undefined),
     models,
   };
 }

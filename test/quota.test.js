@@ -20,6 +20,49 @@ const okBody = {
 
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+test('额度归一化：实测返回（窗口在 model_remains 里 + 剩余百分比）能解析出余量与重置时间', () => {
+  // 2026-11 用 sk-cp 订阅 Key 实测到的真实形状：计数在 model_remains 里且为 0，百分比单独给。
+  const live = {
+    model_remains: [{
+      start_time: 1794412906381,
+      end_time: 1794430906381,
+      remains_time: 14159657,
+      current_interval_total_count: 0,
+      current_interval_usage_count: 0,
+      model_name: 'general',
+      current_weekly_total_count: 0,
+      current_weekly_usage_count: 0,
+      weekly_start_time: 1793947798228,
+      weekly_end_time: 1794552598228,
+      weekly_remains_time: 135851504,
+      current_interval_status: 1,
+      current_interval_remaining_percent: 90,
+      current_weekly_status: 1,
+      current_weekly_remaining_percent: 7,
+    }],
+    base_resp: { status_code: 0, status_msg: 'success' },
+  };
+  const quota = normalizeQuota(live);
+  assert.equal(quota.interval5h.percentRemaining, 90, '5 小时窗口的剩余百分比');
+  assert.equal(quota.weekly.percentRemaining, 7, '周窗口的剩余百分比');
+  assert.equal(quota.interval5h.resetAt, new Date(1794430906381).toISOString(), '5 小时窗口的重置时间');
+  assert.equal(quota.weekly.resetAt, new Date(1794552598228).toISOString(), '周窗口的重置时间');
+  assert.equal(quota.remainsTimeMs, 14159657, '5 小时窗口的倒计时');
+  assert.equal(quota.models[0].model, 'general');
+  assert.equal(quota.models[0].percentRemaining, 90);
+});
+
+test('额度归一化：多个模型时取最紧的那个窗口', () => {
+  const quota = normalizeQuota({
+    model_remains: [
+      { model_name: 'general', current_interval_remaining_percent: 90, current_weekly_remaining_percent: 40, end_time: 1794430906381, weekly_end_time: 1794552598228 },
+      { model_name: 'MiniMax-M3', current_interval_remaining_percent: 25, current_weekly_remaining_percent: 7, end_time: 1794430906381, weekly_end_time: 1794552598228 },
+    ],
+  });
+  assert.equal(quota.interval5h.percentRemaining, 25);
+  assert.equal(quota.weekly.percentRemaining, 7);
+});
+
 test('额度归一化：usage_count 按「剩余」解读，换算出已用与百分比', () => {
   const quota = normalizeQuota(okBody);
   assert.equal(quota.interval5h.total, 5000000);

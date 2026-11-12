@@ -4,6 +4,12 @@ All notable changes to `dsh-minimax-byapi` are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+- **M Plan balance in the left sidebar.** The sidebar foot now carries a MiniMax balance row: the 5-hour window's remaining percentage is shown inline, and clicking it opens a panel with both windows, the remaining counts and the reset times. The widget refreshes itself every five minutes and can be refreshed by hand. Querying needs the API key, and keys never leave the dsh credential store, so the query runs in the host process and the web client calls the host over `/api/minimaxQuota/quota`; no key crosses the wire. A pay-as-you-go key has no M Plan quota at all, so the row hides itself instead of showing an error.
+
+### Fixed
+- **M Plan quota parsing now matches the real response.** The live `/v1/token_plan/remains` answer keeps the window data inside `model_remains[]` (one entry per model) and reports the remaining share as `current_interval_remaining_percent` / `current_weekly_remaining_percent`, with the counters at zero. The previous parser only understood top-level counters, so a real subscription account reported empty windows. The counter-shaped response is still parsed as a fallback, and when several models are listed the tightest window wins.
+
 ### Changed
 - The release workflow now publishes to npm through [trusted publishing (OIDC)](https://docs.npmjs.com/trusted-publishers) instead of a repository npm secret: the workflow holds no npm token and asks GitHub for a short-lived OIDC token through `id-token: write`. The trusted publisher is registered once per package, on npmjs.com (organization or user `NingYuanLee`, repository `dsh-minimax-byapi`, workflow filename `release.yml`, environment empty) or with `npm trust github dsh-minimax-byapi --file release.yml --repo NingYuanLee/dsh-minimax-byapi --allow-publish`, and a local release now goes through `npm login --auth-type=web` (two-hour session token) plus `npm publish --otp <code>`.
 

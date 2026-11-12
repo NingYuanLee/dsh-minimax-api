@@ -9,6 +9,7 @@ import { normalizeBaseURL, apiRootOf, readCatalog, chatModels, expandPath, PLAN_
 import { buildChatAdapter } from './adapter.js';
 import { MediaManager } from './media.js';
 import { fetchQuota } from './minimax-api.js';
+import { MinimaxQuotaService, QUOTA_NAMESPACE } from './quota-service.js';
 import { MinimaxRuntime } from './service.js';
 
 export const name = 'minimax-byapi';
@@ -262,6 +263,13 @@ export async function apply(ctx, config) {
     ready: null,
   };
   new MinimaxRuntime(ctx, runtime);
+  // 侧栏余额组件的服务端接口：/api/minimaxQuota/quota。
+  // 密钥只在凭据库里且不过网，所以额度查询必须留在宿主，由网关把结果转发给前端。
+  try {
+    ctx.provide(QUOTA_NAMESPACE, new MinimaxQuotaService(runtime));
+  } catch (error) {
+    ctx.logger?.warn?.('minimax-byapi: 注册额度接口失败 ' + (error?.message || error));
+  }
   // defineTool 会把工具描述快照成字符串，清单变化后媒体工具必须重建，所以这里提供订阅点。
   const refreshedListeners = new Set();
   runtime.onRefreshed = listener => { refreshedListeners.add(listener); return () => { refreshedListeners.delete(listener); }; };
