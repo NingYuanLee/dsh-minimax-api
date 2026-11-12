@@ -2,6 +2,14 @@
 
 All notable changes to `dsh-minimax-api` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- **MiniMax-H3-Image and MiniMax-H3-Image-Highspeed.** Both models are built into the image catalog and use the new `/v1/images/generations` and `/v1/images/edits` endpoints while the legacy models keep `/v1/image_generation`.
+- **Complete H3 generation parameters.** Supports 32000-Unicode-character prompts, 1–10 outputs, explicit `size`, arbitrary valid `aspect_ratio`, `area`, `output_format`, `output_compression`, `url`/`b64_json`, visible watermarking and the generation-only `disable_prompt_enhanced` switch. Local validation enforces dimension, area, Base64 and prompt-enhancement rules without changing legacy validation.
+- **H3 SSE and partial results.** Parses generation and edit event streams, ignores keepalives, restores completion order by `image_index`, saves successful images and exposes per-image failures, usage, request ID, dimensions and revised prompts. Incomplete streams remain submission-unknown and are never automatically regenerated.
+- **General H3 image references.** Accepts 1–16 HTTPS, `mm_file://`, data-URI or saved-task references, including multiple `source_task_ids`, with the official 64 MiB request-body cap.
+
 ## 0.2.2
 
 ### Changed

@@ -596,6 +596,10 @@ test('各媒体模型卡片始终显示所选模型的简介', () => {
   assert.match(text, /v2，768P\/2K/, '视频模型要有简介');
   const blank = mount(Client, { state: { connection: { baseURL: BASE_URL }, media: {}, modelOverrides: [] } });
   assert.doesNotMatch(textsOf(blank()), /文生图\/图生图/);
+  const h3 = mount(Client, { state: {
+    connection: { baseURL: BASE_URL }, media: { imageModel: 'MiniMax-H3-Image' }, modelOverrides: [],
+  } });
+  assert.match(textsOf(h3()), /16 参考图.*2000 万像素.*SSE/);
 });
 
 test('媒体模型拆成图片/视频/语音三张常展开卡片，标题带图标', () => {

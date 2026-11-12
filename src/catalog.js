@@ -23,6 +23,8 @@ export const CHAT_MODELS = [
 
 // 媒体能力模型。发现接口未必列出这些模型，因此内置一份常量兜底。
 export const MEDIA_MODELS = [
+  { id: 'MiniMax-H3-Image', category: 'image', note: '新一代文生图与图片编辑，1–16 张参考图，最大 2000 万像素，支持 SSE' },
+  { id: 'MiniMax-H3-Image-Highspeed', category: 'image', note: 'H3 Image 高速版，参数与 MiniMax-H3-Image 相同' },
   { id: 'image-01', category: 'image', note: '文生图与图生图，支持 21:9 与指定宽高' },
   { id: 'image-01-live', category: 'image', note: '在 image-01 基础上额外支持画风设置（style），不支持 21:9' },
   { id: 'MiniMax-H3', category: 'video', note: 'v2 接口，768P/2K，4–15 秒' },

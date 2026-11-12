@@ -101,6 +101,8 @@ export const zh = {
   'settings.media.image': '图片模型',
   'settings.media.video': '视频模型',
   'settings.media.speech': '语音模型',
+  'settings.modelNote.MiniMax-H3-Image': '新一代文生图/编辑，16 参考图，最大 2000 万像素，SSE',
+  'settings.modelNote.MiniMax-H3-Image-Highspeed': 'H3 Image 高速版，参数与标准版相同',
   'settings.modelNote.image-01': '文生图/图生图，8 种比例，21:9 仅此模型',
   'settings.modelNote.image-01-live': '支持画风，不支持 21:9',
   'settings.modelNote.MiniMax-H3': 'v2，768P/2K，4–15 秒',
@@ -286,6 +288,8 @@ export const en = {
   'settings.media.image': 'Image model',
   'settings.media.video': 'Video model',
   'settings.media.speech': 'Speech model',
+  'settings.modelNote.MiniMax-H3-Image': 'New generation/editing, 16 references, up to 20 MP, SSE',
+  'settings.modelNote.MiniMax-H3-Image-Highspeed': 'H3 Image Highspeed; same parameters as standard',
   'settings.modelNote.image-01': 'Text/image to image, 8 ratios, 21:9 only here',
   'settings.modelNote.image-01-live': 'Adds styles; no 21:9',
   'settings.modelNote.MiniMax-H3': 'v2, 768P/2K, 4–15 s',
@@ -625,7 +629,7 @@ const MEDIA_CATEGORY_PATTERNS = {
 const MEDIA_CATEGORIES = ['image', 'video', 'speech', 'music'];
 // 媒体模型简介：设置页下拉下方展示一行说明，选中时更新；key 必须与字典里的 settings.modelNote.* 一致。
 const MEDIA_NOTE_IDS = new Set([
-  'image-01', 'image-01-live',
+  'MiniMax-H3-Image', 'MiniMax-H3-Image-Highspeed', 'image-01', 'image-01-live',
   'MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max',
   'MiniMax-Hailuo-2.3', 'MiniMax-Hailuo-2.3-Fast', 'MiniMax-Hailuo-02',
   'speech-2.8-hd', 'speech-2.8-turbo', 'speech-2.6-hd', 'speech-2.6-turbo', 'speech-02-hd', 'speech-02-turbo',

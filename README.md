@@ -232,14 +232,23 @@ The catalog is the merge of `GET {root}/v1/models` and the plugin's built-in con
 
 | Capability | Models |
 | --- | --- |
-| Image | `image-01` (text and image to image), `image-01-live` (same, plus style settings) |
+| Image (H3) | `MiniMax-H3-Image`, `MiniMax-H3-Image-Highspeed` — text-to-image and general image editing with identical parameters and limits |
+| Image (legacy endpoint) | `image-01` (text-to-image and portrait reference), `image-01-live` (plus style settings) |
 | Video (v2 endpoint) | `MiniMax-H3` (768P / 2K, 4–15 s), `MiniMax-H3-Highspeed` (480P / 768P, 4–15 s), `MiniMax-H3-Lite` (480P / 768P, 4–15 s, no `adaptive` ratio), `MiniMax-H3-Max` (480P / 768P, 5–15 s) |
 | Video (v1 endpoint) | `MiniMax-Hailuo-2.3`, `MiniMax-Hailuo-2.3-Fast` (image to video only), `MiniMax-Hailuo-02` — 6 s or 10 s, 512P / 720P / 768P / 1080P |
 | Speech | `speech-2.8-hd`, `speech-2.8-turbo`, `speech-2.6-hd`, `speech-2.6-turbo`, `speech-02-hd`, `speech-02-turbo` |
 | Speech to text | `asr-1.0` |
 | Music | `music-3.0`, `music-2.6`, `music-cover` — retired, see below |
 
-Each media picker in the settings page shows a one-line description of the currently selected model, and the options carry the same text as a tooltip. Image generation accepts an aspect ratio of `1:1`, `16:9`, `4:3`, `3:2`, `2:3`, `3:4`, `9:16` or `21:9` — `21:9` is `image-01` only — a prompt of at most 1500 characters and `n` between 1 and 9. `image-01` also accepts an explicit `width`/`height` pair (512–2048 px, multiples of 8, both required); when both are given the plugin honours the explicit pixel size and does not send `aspect_ratio` (upstream would otherwise ignore `width`/`height`). `image-01-live` additionally accepts a `style` object (`style_type` 漫画 / 元气 / 中世纪 / 水彩, `style_weight` in (0, 1]). Image-to-image passes the reference image as `subject_reference` (a `character` reference: a public URL or a `data:image/jpeg;base64,…` Data URL, JPG/JPEG/PNG under 10 MB).
+Each media picker in the settings page shows a one-line description of the currently selected model, and the options carry the same text as a tooltip.
+
+**H3 Image** uses `POST /v1/images/generations` for text-to-image and `POST /v1/images/edits` for editing. Both accept a prompt up to 32000 Unicode characters, `n` from 1 to 10, `output_format` `jpeg`/`jpg`/`png`/`webp`, `output_compression` from 0 to 100, visible `aigc_watermark`, `response_format` `url`/`b64_json`, and per-image SSE with `stream`. The plugin restores image order with `image_index`, saves successful items, and returns partial `failures`, `usage`, `requestId`, actual dimensions and revised prompts. H3 requests use a timeout of at least 600 seconds. The API is not idempotent: an interrupted request must never be retried automatically.
+
+Use `size: auto` (the default) with `aspect_ratio` and `area`, or an explicit `size: WIDTHxHEIGHT`. Area tiers are `1K`/`2K`/`4K` (default `4K`). A ratio is `auto` or X:Y with integer components from 1 to 300 and an actual ratio between 1:3 and 3:1. Explicit dimensions must cover 655360–20000000 pixels and cannot be combined with `aspect_ratio` or `area`, even when those are `auto`. The tool's `width`/`height` pair is converted to H3 `size`. Text-to-image uses Prompt enhancement by default; `disable_prompt_enhanced: true` requires explicit dimensions or a fixed ratio. Editing always enhances and has no such switch. Base64 cannot be streamed: total `n × area` is capped at 20 million pixels for PNG and 80 million for JPEG/WebP.
+
+H3 editing accepts 1–16 references through `image_url`, `image_urls`, `source_task_id` or `source_task_ids`, using HTTPS, lowercase data URIs or `mm_file://{file_id}`. Formats are JPG/JPEG/PNG/WebP/HEIC/HEIF. Each file and the complete JSON edit body are limited to 64 MiB; Base64 expands data by about 4/3, so use URL or `mm_file` for large inputs. Both dimensions must be 128–8192 px and the long/short side ratio at most 4:1. Masks, transparent backgrounds and preview images are not supported.
+
+**Legacy image models** accept aspect ratios `1:1`, `16:9`, `4:3`, `3:2`, `2:3`, `3:4`, `9:16` and `21:9` (`21:9` is `image-01` only), a prompt up to 1500 characters and `n` from 1 to 9. `image-01` also accepts a `width`/`height` pair (512–2048 px, multiples of 8, both required); the plugin honours explicit dimensions and omits `aspect_ratio` when both are supplied. `image-01-live` adds `style` (`style_type` 漫画 / 元气 / 中世纪 / 水彩, `style_weight` in (0, 1]). Image-to-image uses `subject_reference` for a portrait character reference (public URL or data URI, JPG/JPEG/PNG under 10 MB). Legacy `prompt_optimizer` and `seed` are never mixed into H3 requests.
 
 Video generation is asynchronous in three steps: create the task, query the task, then download the file. The plugin keeps the task id, so `minimax_media_status` can fetch the finished clip without submitting a new one.
 
