@@ -212,7 +212,7 @@ Retired and no longer callable: `MiniMax-M2`, `M2.1`, `M2.5`, `M2.7`, `M2.7-high
 
 ### Text model parameters
 
-The plugin maps MiniMax's text parameters onto the dsh surfaces that own them. Parameters are per request, so they live in dsh's model picker and the plugin settings page's model table, not in a separate form:
+The plugin maps MiniMax's text parameters onto the dsh surfaces that own them; they are per request, so the model picker and the model table control them:
 
 | MiniMax parameter | What the plugin does | Where you control it |
 | --- | --- | --- |
@@ -226,7 +226,7 @@ The plugin maps MiniMax's text parameters onto the dsh surfaces that own them. P
 
 Two route differences worth knowing: `MiniMax-M3` defaults to adaptive thinking on the OpenAI-compatible route but to no thinking on the Anthropic-compatible route, and `MiniMax-M3.1-Flash` rejects `thinking: disabled` on both. The plugin therefore never sends a disable request.
 
-The catalog is the merge of `GET {root}/v1/models` and the plugin's built-in constants, so the media models below stay listed even when the discovery endpoint only returns chat models. The settings page's model table is what the picker shows — delete a row and save to hide that model.
+The catalog is the merge of `GET {root}/v1/models` and the plugin's built-in constants, so the media models below stay listed even when the discovery endpoint only returns chat models.
 
 ### Media models
 

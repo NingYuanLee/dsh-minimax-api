@@ -2,6 +2,16 @@
 
 All notable changes to `dsh-minimax-api` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.2
+
+### Changed
+- **Tool descriptions carry only what the schema does not.** The media and model tools no longer repeat every parameter in prose; the descriptions keep the cross-parameter rules (model-specific limits, the `adaptive` ratio rules, retry and double-billing warnings) and leave ranges, defaults and formats to the parameter schema the model already receives.
+- **Short settings copy.** Connection, credential, model, error and capability hints are shorter; the capability list is one line per tool instead of a multi-line input/output block.
+- **README de-duplication.** Removed a repeated statement about the model table and tightened the text-parameter introduction; no facts changed.
+
+### Fixed
+- **The plugin page no longer quotes outdated media limits.** The capability descriptions claimed a 60,000-character prompt, `n` 1–4 and a 1–15 s default duration, none of which any tool enforces; those numbers are gone.
+
 ## 0.2.1
 
 ### Changed

@@ -100,14 +100,14 @@ test('远程发现结果包在 ok/value 里时仍能列出模型', async () => {
   const Client = loadClient();
   const current = mount(Client, { discover: async () => ({ ok: true, value: DISCOVERED }) });
   await buttonByText(current(), '获取模型').props.onClick();
-  assert.match(statusText(current()), /已发现 6 个模型/);
+  assert.match(statusText(current()), /发现 6 个模型/);
 });
 
 test('点获取模型后提示数量，媒体下拉只列同类模型', async () => {
   const Client = loadClient();
   const current = await discoveredTree(Client);
     const tree = current();
-  assert.match(statusText(tree), /已发现 6 个模型/);
+  assert.match(statusText(tree), /发现 6 个模型/);
   assert.equal(current.seen[0].baseURL, BASE_URL);
   assert.equal(current.seen[0].apiKey, undefined);
   for (const label of ['图片模型', '视频模型', '语音模型']) byLabel(current(), label).props.onClick();
@@ -161,7 +161,7 @@ test('已配置密钥时按引用名数组查询并自动展开模型', async ()
   for (const effect of Client.runtime.effects) effect();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(described, [['MINIMAX_API_KEY']]);
-  assert.match(statusText(current()), /已发现 6 个模型/);
+  assert.match(statusText(current()), /发现 6 个模型/);
   assert.ok(byLabel(current(), '模型 ID 0'), '语言模型表始终渲染');
   assert.ok(walk(chatSelect(current())).some(n => n.props?.value === 'MiniMax-M2'));
 });
@@ -201,7 +201,7 @@ test('插件详情页等配置读完再自动获取，不用空地址', async ()
   assert.equal(seen.length, 1);
   assert.equal(seen[0].baseURL, 'https://gateway.example/v1');
   assert.equal(seen[0].api, 'anthropic-messages');
-  assert.match(statusText(runtime.renders.at(-1)), /已发现 6 个模型/);
+  assert.match(statusText(runtime.renders.at(-1)), /发现 6 个模型/);
   assert.doesNotMatch(statusText(runtime.renders.at(-1)), /provider route/);
 });
 
@@ -452,7 +452,7 @@ test('配置挂在插件上，每个媒体工具都有结果卡片', () => {
   const bundles = registered.filter(r => r.name === 'plugins.bundle.config');
   assert.equal(bundles.length, 1);
   assert.equal(bundles[0].key, 'dsh-minimax-api');
-  assert.match(textsOf(bundles[0].component({ view: 'summary' })), /MiniMax 连接、密钥与模型参数/);
+  assert.match(textsOf(bundles[0].component({ view: 'summary' })), /MiniMax 连接与模型参数/);
   const rows = registered.filter(r => r.name === 'plugins.row.config');
   assert.deepEqual(rows.map(r => r.key).sort(), ['dsh-minimax-api#dsh-minimax-media', 'dsh-minimax-api#minimax-api']);
   const chat = rows.find(row => row.key.endsWith('#minimax-api'));
@@ -460,16 +460,16 @@ test('配置挂在插件上，每个媒体工具都有结果卡片', () => {
   const chatText = textsOf(chat.component({ view: 'page' }));
   const mediaText = textsOf(media.component({ view: 'page' }));
   assert.match(chatText, /minimax_models/);
-  assert.match(chatText, /输入：/);
-  assert.match(chatText, /产出：/);
+  assert.match(chatText, /刷新模型清单/);
+  assert.match(chatText, /M Plan 的 5 小时与周限额/);
   assert.match(chatText, /dsh-minimax-media/);
   assert.doesNotMatch(chatText, /minimax_edit_image/);
-  assert.match(mediaText, /图生图/);
-  assert.match(mediaText, /图生视频/);
+  assert.match(mediaText, /按参考图编辑/);
+  assert.match(mediaText, /提交视频任务/);
   assert.match(mediaText, /minimax_generate_music/);
   assert.match(mediaText, /minimax_transcribe/);
-  assert.match(mediaText, /音乐模型官方已退役/);
-  assert.match(mediaText, /不提供：实时语音/);
+  assert.match(mediaText, /已退役，仅存量付费账号/);
+  assert.match(mediaText, /不提供实时语音/);
   assert.doesNotMatch(mediaText, /不提供：语音识别/);
   assert.match(mediaText, /minimax-api/);
   assert.doesNotMatch(mediaText, /刷新模型目录/);
@@ -513,7 +513,7 @@ test('首次挂载（还没获取模型）不抛错：effect 不能解引用 nul
 
 test('摘要视图返回一句话', () => {
   const Client = loadClient();
-  assert.match(textsOf(Client.exports.MinimaxSettings({ view: 'summary' })), /MiniMax 连接、密钥与模型参数/);
+  assert.match(textsOf(Client.exports.MinimaxSettings({ view: 'summary' })), /MiniMax 连接与模型参数/);
 });
 
 test('保存时把密钥写入凭据库，配置里不留明文', async () => {

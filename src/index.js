@@ -310,9 +310,7 @@ export async function apply(ctx, config) {
   const refreshedListeners = new Set();
   runtime.onRefreshed = listener => { refreshedListeners.add(listener); return () => { refreshedListeners.delete(listener); }; };
 
-  tool('minimax_models', '获取/刷新 MiniMax 模型清单，按能力分组返回。调用场景：用户要换模型、要生图/生视频/生音频/要转写语音、或刚改过插件设置（地址、密钥、模型参数）。'
-    + '返回的 chat 类模型可用于对话，image/video/speech/music 类分别是生成图片/视频/语音/音乐的可用模型 ID；调用生成工具时应把这里返回的 ID 原样传给 model 参数，不要自行编造或改写模型名。'
-    + '参数：refresh=true 强制重新向服务端拉取；verify_key=true 额外做一次密钥自检（一次 GET /v1/models），可判断密钥或地址是否配错。',
+  tool('minimax_models', '获取/刷新 MiniMax 模型清单（按能力分组）。生成工具应原样使用返回的模型 ID。refresh=true 强制重拉；verify_key=true 顺带检查地址与密钥。',
   { refresh: { type: 'boolean', description: '强制重新拉取模型清单（默认只在清单为空或已缓存时使用缓存）' },
     verify_key: { type: 'boolean', description: '顺带做密钥自检：报告密钥/地址是否可用，不返回密钥内容' } }, async args => {
     let verify;
@@ -322,10 +320,7 @@ export async function apply(ctx, config) {
   });
 
   // 额度查询走官方 www 主机上的 /v1/token_plan/remains，只有订阅 Key 能用。
-  tool('minimax_quota', '查询当前 M Plan 订阅的额度余量与窗口重置时间。用户问“我还剩多少额度 / 额度用了多少 / 什么时候重置 / M Plan 用量”时用这个工具。'
-    + '只有订阅 Key（sk-cp-…）能查：按量付费 API Key 会被服务端拒绝（那种计费本来就没有 M Plan 额度），此时工具会返回可读的错误说明。'
-    + '返回 interval5h（5 小时窗口）与 weekly（周窗口）的 total / remaining / used / percentRemaining / resetAt，以及服务端给出时按模型的拆分 models[]。'
-    + '注意：文本、图像、语音等非视频能力受 5 小时窗口与周窗口共同限制，视频只受周窗口限制；额度余量不结转。数值以服务端返回为准，最终以 MiniMax 控制台用量页为权威。',
+  tool('minimax_quota', '查询 M Plan 额度余量与重置时间。只有订阅 Key 能查；返回 interval5h、weekly 与可选的 models[]。视频只受周窗口限制，其余受两个窗口限制。',
   {}, async () => quota());
 
 

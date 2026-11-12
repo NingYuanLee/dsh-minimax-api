@@ -233,7 +233,7 @@ test('只读提供商页与摘要都有英文，provider id 是 minimax-api', ()
   const form = { state: { value: { connection: { baseURL: 'https://gateway.example/v1' } } } };
   const detail = textsOf(Client.exports.MinimaxProviderNotice({ view: 'detail', form, t: enT }));
   assert.match(detail, /MiniMax provider/);
-  assert.match(detail, /read-only/);
+  assert.match(detail, /Read-only/);
   assert.match(detail, /API address/);
   assert.match(detail, /API key/);
   assert.match(detail, /Plugins → dsh-minimax-api → MiniMax API Access/);
