@@ -225,6 +225,23 @@ Multimodal parts on this route: `type` ∈ `input_text` | `output_text` | `input
 
 ## 4. Image generation
 
+### H3 Image (checked 2026-11-13)
+
+Models: `MiniMax-H3-Image` and `MiniMax-H3-Image-Highspeed`; generation and editing parameters are identical.
+
+- Text-to-image: `POST /v1/images/generations`; editing: `POST /v1/images/edits`.
+- Prompt ≤32000 Unicode characters; `n` 1–10; output `jpeg`/`jpg`/`png`/`webp`; compression 0–100; visible watermark optional.
+- `size` is `auto` or `WIDTHxHEIGHT`. Auto combines `aspect_ratio` (`auto` or X:Y, components 1–300, ratio 1:3–3:1) with `area` (`1K`/`2K`/`4K`, default `4K`). Explicit dimensions cover 655360–20000000 pixels and are mutually exclusive with ratio and area, including `auto`.
+- Generation enhancement defaults on; `disable_prompt_enhanced: true` requires explicit dimensions or a fixed ratio. Editing always enhances.
+- `response_format` is `url` (24-hour links) or `b64_json`. Base64 total output area is capped at 20 million pixels for PNG and 80 million for JPEG/WebP.
+- `stream: true` returns SSE (URL only): `<prefix>.partial_succeeded`, `.partial_failed`, `.completed`, or `error`, where prefix is `image_generation` or `image_edit`. Keepalive comments are allowed; success order is completion order and `image_index` is authoritative.
+- Non-stream response `data` contains one object per requested image: success has `url`/`b64_json`, `size`, `revised_prompt`; failure has `error`. HTTP 200 permits partial failure. All-failed responses use HTTP 402/422/500.
+- Editing takes `images: [{image_url}]`, 1–16 items; URL may be HTTPS, `mm_file://{file_id}` or a lowercase data URI. JPG/JPEG/PNG/WebP/HEIC/HEIF; each file and the whole request ≤64 MiB; width/height 128–8192 px; long/short ratio ≤4:1. Multipart uses repeated `image` or `image[]` files. No mask, transparent background or preview image.
+- Both routes can take up to 600 seconds and are not idempotent; disconnects do not cancel billing for completed images.
+- Sources: https://platform.minimax.cn/docs/guides/image-generation.md, https://platform.minimax.cn/docs/api-reference/image-generation-h3-generations.md, https://platform.minimax.cn/docs/api-reference/image-generation-h3-edits.md, https://platform.minimax.cn/docs/api-reference/image-generation-h3-streaming.md
+
+### Legacy image-01 family
+
 **Endpoint: `POST /v1/image_generation`** — one path serves both text-to-image and image-to-image.
 (https://platform.minimax.io/docs/api-reference/image-generation-t2i.md and .../image-generation-i2i.md)
 

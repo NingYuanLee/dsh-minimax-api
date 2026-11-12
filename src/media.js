@@ -3,10 +3,11 @@ import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { withFileLock } from './lock.js';
 import {
-  createImage, createVideoV1, createVideoV2, queryVideoV1, queryVideoV2, retrieveFile,
+  createImage, createH3Image, createVideoV1, createVideoV2, queryVideoV1, queryVideoV2, retrieveFile,
   synthesizeSpeech, generateMusic, transcribeAudio, listVoices, createSpeechAsync, querySpeechAsync,
-  normalizeApiRoot, isVideoV2, MiniMaxError,
+  normalizeApiRoot, isVideoV2, isH3Image, MiniMaxError,
   ASR_MAX_BYTES, IMAGE_ASPECT_RATIOS, IMAGE_STYLE_TYPES, PROMPT_EXPANSION_MODES,
+  H3_IMAGE_AREAS, H3_IMAGE_FORMATS, H3_IMAGE_MAX_BYTES, H3_IMAGE_TIMEOUT_MS,
 } from './minimax-api.js';
 
 const ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -21,6 +22,10 @@ const FILE_PATTERN = /^result-\d+\.(png|jpg|gif|webp|mp4|mp3|wav|flac|pcm|ulaw|o
 const INLINE_LIMIT = 8 * 1024 * 1024;
 // 官方文档给出的各接口输入上限。
 const IMAGE_PROMPT_MAX = 1500;
+const H3_IMAGE_PROMPT_MAX = 32000;
+const H3_IMAGE_COUNT_MAX = 10;
+const H3_IMAGE_REFERENCE_MAX = 16;
+const H3_IMAGE_AREA_PIXELS = { '1K': 1024 * 1024, '2K': 2048 * 2048, '4K': 4096 * 4096 };
 const VIDEO_PROMPT_MAX = 2000;
 const VIDEO_PROMPT_MAX_V2 = 7000;
 const SPEECH_TEXT_MAX = 10000;
@@ -67,8 +72,51 @@ function sleep(ms, signal) {
 }
 function requireText(value, label, max) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(label + '不能为空');
-  if (value.length > max) throw new Error(label + '不能超过 ' + max + ' 个字符');
-  return value.trim();
+  const text = value.trim();
+  // 官方按 Unicode 字符计数，不按 UTF-16 code unit 计数。
+  if (Array.from(text).length > max) throw new Error(label + '不能超过 ' + max + ' 个字符');
+  return text;
+}
+
+function parseH3Size(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || !value.trim()) throw new Error('H3 Image 的 size 必须为 auto 或 宽x高');
+  const size = value.trim();
+  if (size === 'auto') return { size };
+  const match = /^([1-9]\d*)x([1-9]\d*)$/.exec(size);
+  if (!match) throw new Error('H3 Image 的 size 必须为 auto 或 宽x高，例如 2720x1536');
+  const width = Number(match[1]), height = Number(match[2]), pixels = width * height;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || !Number.isSafeInteger(pixels)) throw new Error('H3 Image 尺寸超出有效范围');
+  if (pixels < 655360 || pixels > 20000000) throw new Error('H3 Image 图片面积必须在 655360–20000000 像素之间');
+  if (width > 3 * height || height > 3 * width) throw new Error('H3 Image 宽高比必须在 1:3 到 3:1 之间');
+  return { size, width, height, pixels };
+}
+
+function parseH3Ratio(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || !value.trim()) throw new Error('H3 Image 宽高比必须为 auto 或 X:Y');
+  const ratio = value.trim();
+  if (ratio === 'auto') return ratio;
+  const match = /^([1-9]\d*):([1-9]\d*)$/.exec(ratio);
+  if (!match) throw new Error('H3 Image 宽高比必须为 auto 或 X:Y，例如 16:9');
+  const x = Number(match[1]), y = Number(match[2]);
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x > 300 || y > 300) throw new Error('H3 Image 宽高比的 X、Y 必须为 1–300 的整数');
+  if (x > 3 * y || y > 3 * x) throw new Error('H3 Image 宽高比必须在 1:3 到 3:1 之间');
+  return ratio;
+}
+
+function imageOutcome(result) {
+  return {
+    sources: result.images.map((image, index) => ({
+      ...(image.url ? { url: image.url } : { b64: image.base64 }),
+      imageIndex: Number.isInteger(image.imageIndex) ? image.imageIndex : index,
+      ...(image.dimensions ? { dimensions: image.dimensions } : {}),
+      ...(image.revisedPrompt ? { revisedPrompt: image.revisedPrompt } : {}),
+    })),
+    requestId: result.requestId,
+    usage: result.usage,
+    failures: result.failures,
+  };
 }
 
 export class MediaManager {
@@ -117,10 +165,13 @@ export class MediaManager {
     });
   }
   public(task) {
-    const { id, owner, kind, model, status, remoteId, fileId, progress, error, createdAt, updatedAt } = task;
+    const { id, owner, kind, model, status, remoteId, fileId, progress, error, createdAt, updatedAt, requestId, usage, failures } = task;
     return { id, owner, kind, model, status, ...(remoteId ? { remoteId } : {}), ...(fileId ? { fileId } : {}),
+      ...(requestId ? { requestId } : {}), ...(usage ? { usage } : {}), ...(failures?.length ? { failures } : {}),
       ...(Number.isFinite(progress) ? { progress } : {}), ...(error ? { error } : {}), createdAt, updatedAt,
-      files: task.files.map(f => ({ path: join(this.directory(task), f.name), mime: f.mime, size: f.size })) };
+      files: task.files.map(f => ({ path: join(this.directory(task), f.name), mime: f.mime, size: f.size,
+        ...(Number.isInteger(f.imageIndex) ? { imageIndex: f.imageIndex } : {}),
+        ...(f.dimensions ? { dimensions: f.dimensions } : {}), ...(f.revisedPrompt ? { revisedPrompt: f.revisedPrompt } : {}) })) };
   }
   lookup(id, owner) {
     const task = this.tasks.get(id);
@@ -132,7 +183,7 @@ export class MediaManager {
   async locked(id, operation) {
     return this.withTaskLock(id, operation);
   }
-  signal(signal) { return AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(this.timeoutMs)]); }
+  signal(signal, timeoutMs = this.timeoutMs) { return AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeoutMs)]); }
   client(apiKey, signal) {
     return { apiRoot: this.apiRoot, apiKey, fetchImpl: this.fetch, signal };
   }
@@ -158,32 +209,48 @@ export class MediaManager {
       return { bytes: await bounded(response, this.maxBytes, signal), declared: response.headers.get('content-type')?.split(';')[0] };
     }
   }
-  async inlineFile(task, mimePrefix) {
+  async inlineFile(task, mimePrefix, limit = INLINE_LIMIT) {
     if (task.status !== 'saved' || !task.files.length) throw new Error('只能引用已保存的媒体任务');
     const file = task.files[0];
     if (!file.mime?.startsWith(mimePrefix)) throw new Error('引用的任务不是所需的媒体类型');
     const bytes = await readFile(join(this.directory(task), file.name));
-    if (!bytes.length || bytes.length > INLINE_LIMIT) throw new Error('本地文件超过 8MB，请改用 HTTPS 地址');
+    if (!bytes.length || bytes.length > limit) throw new Error('本地文件超过 ' + Math.round(limit / 1024 / 1024) + 'MB，请改用 HTTPS 地址' + (limit > INLINE_LIMIT ? '或 mm_file://' : ''));
     return 'data:' + file.mime + ';base64,' + bytes.toString('base64');
   }
-  // 图生图 / 图生视频的参考图：公网地址、data URL 或已保存图片任务。
-  // 官方限制：参考图为人像主体，JPG/JPEG/PNG 且小于 10MB。
-  async imageReferences(args, owner) {
+  // 旧模型使用人像主体参考；H3 使用通用 images[]，支持 URL、mm_file、data URI 与已保存任务。
+  async imageReferences(args, owner, h3 = false) {
     const urls = [];
+    const maxReferences = h3 ? H3_IMAGE_REFERENCE_MAX : REFERENCE_MAX;
     const push = value => {
       if (typeof value !== 'string' || !value.trim()) return;
       const url = value.trim();
       if (url.startsWith('data:image/')) {
-        if (url.length > INLINE_LIMIT * 2) throw new Error('参考图过大');
-        if (dataUrlBytes(url) > SUBJECT_MAX_BYTES) throw new Error('参考图不能超过 10MB');
+        if (h3 && !/^data:image\/(?:jpeg|jpg|png|webp|heic|heif);base64,/.test(url)) {
+          throw new Error('H3 Image 参考图 data URI 必须使用小写 jpeg/jpg/png/webp/heic/heif 格式与 Base64');
+        }
+        if (!h3 && url.length > INLINE_LIMIT * 2) throw new Error('参考图过大');
+        const limit = h3 ? H3_IMAGE_MAX_BYTES : SUBJECT_MAX_BYTES;
+        if (dataUrlBytes(url) > limit) throw new Error('参考图不能超过 ' + Math.round(limit / 1024 / 1024) + 'MB');
         urls.push(url); return;
       }
+      if (h3 && /^mm_file:\/\/[^\s/]+$/.test(url)) { urls.push(url); return; }
       this.validateURL(url); urls.push(url);
     };
     if (typeof args.image_url === 'string') push(args.image_url);
-    if (Array.isArray(args.image_urls)) { if (args.image_urls.length > REFERENCE_MAX) throw new Error('图片编辑最多 ' + REFERENCE_MAX + ' 张参考图'); for (const item of args.image_urls) push(item); }
-    if (typeof args.source_task_id === 'string' && args.source_task_id) urls.push(await this.inlineFile(this.lookup(args.source_task_id, owner), 'image/'));
-    if (urls.length < 1 || urls.length > REFERENCE_MAX) throw new Error('图片编辑需要 1 到 ' + REFERENCE_MAX + ' 张参考图（image_url、image_urls 或已保存图片任务）；参考图为人像主体参考，JPG/JPEG/PNG 且小于 10MB');
+    if (Array.isArray(args.image_urls)) {
+      if (args.image_urls.length > maxReferences) throw new Error('图片编辑最多 ' + maxReferences + ' 张参考图');
+      for (const item of args.image_urls) push(item);
+    }
+    const taskIds = [
+      ...(typeof args.source_task_id === 'string' && args.source_task_id ? [args.source_task_id] : []),
+      ...(Array.isArray(args.source_task_ids) ? args.source_task_ids : []),
+    ];
+    for (const id of taskIds) urls.push(await this.inlineFile(this.lookup(id, owner), 'image/', h3 ? H3_IMAGE_MAX_BYTES : INLINE_LIMIT));
+    if (urls.length < 1 || urls.length > maxReferences) {
+      throw new Error(h3
+        ? 'H3 图片编辑需要 1 到 16 张参考图；支持 HTTPS、mm_file://、data URI 或已保存图片任务，请求体总计不超过 64MiB'
+        : '图片编辑需要 1 到 ' + REFERENCE_MAX + ' 张参考图（image_url、image_urls 或已保存图片任务）；参考图为人像主体参考，JPG/JPEG/PNG 且小于 10MB');
+    }
     return urls;
   }
   // 图生视频的首帧：只接受一张。
@@ -220,19 +287,24 @@ export class MediaManager {
         const name = 'result-' + (i+1) + mimeTypes[mime]; const path = join(this.directory(task), name); const partial = path + '.part';
         const handle = await open(partial, 'w', 0o600);
         try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
-        await rename(partial, path); task.files.push({ name, mime, size: bytes.length });
+        await rename(partial, path); task.files.push({ name, mime, size: bytes.length,
+          ...(Number.isInteger(source.imageIndex) ? { imageIndex: source.imageIndex } : {}),
+          ...(source.dimensions ? { dimensions: source.dimensions } : {}),
+          ...(source.revisedPrompt ? { revisedPrompt: source.revisedPrompt } : {}) });
         await this.persist(task);
       }
       task.status = 'saved'; delete task.error;
       // Inline media no longer needs a duplicate payload once safely saved.
-      task.sources = task.sources.map(s => s.url ? { url: s.url } : {});
+      task.sources = task.sources.map(s => ({ ...(s.url ? { url: s.url } : {}),
+        ...(Number.isInteger(s.imageIndex) ? { imageIndex: s.imageIndex } : {}),
+        ...(s.dimensions ? { dimensions: s.dimensions } : {}), ...(s.revisedPrompt ? { revisedPrompt: s.revisedPrompt } : {}) }));
     } catch {
       task.status = 'download-failed'; task.error = '结果保存失败（网络、格式或文件系统限制），可重试下载；不会重新生成';
     }
     await this.persist(task); return this.public(task);
   }
   // 所有生成类请求的公共骨架：先落任务，再提交，失败时保留结果已知的任务记录。
-  async create(kind, args, owner, signal, run) {
+  async create(kind, args, owner, signal, run, timeoutMs = this.timeoutMs) {
     if (typeof owner !== 'string' || !owner) throw new Error('缺少任务归属');
     const model = typeof args?.model === 'string' ? args.model.trim() : '';
     if (!model) throw new Error('缺少模型 ID');
@@ -242,10 +314,13 @@ export class MediaManager {
     const task = { id: randomUUID(), owner, kind, model, status: 'submitting', files: [], sources: [], createdAt: now(), updatedAt: now() };
     this.tasks.set(task.id, task); await this.persist(task);
     return this.locked(task.id, async () => {
-      const active = this.signal(signal); let accepted = false;
+      const active = this.signal(signal, timeoutMs); let accepted = false;
       try {
         const outcome = await run(this.client(apiKey, active), args, task);
         accepted = true;
+        if (outcome?.requestId) task.requestId = outcome.requestId;
+        if (outcome?.usage && typeof outcome.usage === 'object') task.usage = outcome.usage;
+        if (Array.isArray(outcome?.failures) && outcome.failures.length) task.failures = outcome.failures;
         if (outcome?.taskId) {
           task.remoteId = outcome.taskId; task.status = 'generating';
           if (outcome.apiVersion) task.apiVersion = outcome.apiVersion;
@@ -267,9 +342,13 @@ export class MediaManager {
       }
     });
   }
-  // 生图参数校验：不同模型可用的字段不同，非法组合直接报错，不发请求。
-  imageArgs(args) {
+  // 生图参数校验：旧模型与 H3 Image 使用不同协议，字段不能混用。
+  imageArgs(args, editing = false) {
     const model = args.model;
+    if (isH3Image(model)) return this.h3ImageArgs(args, editing);
+    for (const key of ['size', 'area', 'output_format', 'response_format', 'stream', 'output_compression', 'disable_prompt_enhanced']) {
+      if (args[key] !== undefined) throw new Error(key + ' 仅 MiniMax-H3-Image 系列支持');
+    }
     const options = { model, response_format: 'url' };
     const styleType = args.style_type;
     const styleWeight = args.style_weight;
@@ -300,7 +379,7 @@ export class MediaManager {
         }
       }
       options.width = args.width; options.height = args.height;
-      // 官方文档说两者同时给出时以 aspect_ratio 为准，这里反过来：给了宽高就不下发 aspect_ratio。
+      // 旧接口同时给出时以 aspect_ratio 为准；插件继续优先使用显式宽高。
       delete options.aspect_ratio;
     }
     if (args.n !== undefined) options.n = args.n;
@@ -309,29 +388,81 @@ export class MediaManager {
     if (typeof args.aigc_watermark === 'boolean') options.aigc_watermark = args.aigc_watermark;
     return options;
   }
-  async image(args, owner, signal) {
-    const prompt = requireText(args.prompt, '图片描述', IMAGE_PROMPT_MAX);
+  h3ImageArgs(args, editing) {
+    const model = args.model;
+    for (const key of ['seed', 'prompt_optimizer', 'style_type', 'style_weight']) {
+      if (args[key] !== undefined) throw new Error(key + ' 仅旧图片模型支持；H3 Image 请使用官方新参数');
+    }
+    if (editing && args.disable_prompt_enhanced !== undefined) throw new Error('H3 Image 图片编辑始终开启 Prompt 增强，不支持 disable_prompt_enhanced');
+    const hasWidth = args.width !== undefined && args.width !== null;
+    const hasHeight = args.height !== undefined && args.height !== null;
+    if (hasWidth !== hasHeight) throw new Error('width 与 height 必须成对设置');
+    if (hasWidth && args.size !== undefined) throw new Error('size 与 width/height 只需选择一种写法');
+    const size = parseH3Size(hasWidth ? args.width + 'x' + args.height : args.size);
+    const ratio = parseH3Ratio(args.aspect_ratio);
+    const explicitSize = size && size.size !== 'auto';
+    if (explicitSize && (args.aspect_ratio !== undefined || args.area !== undefined)) {
+      throw new Error('H3 Image 显式 size 不能同时传 aspect_ratio 或 area（auto 也不行）');
+    }
+    if (args.area !== undefined && !H3_IMAGE_AREAS.includes(args.area)) throw new Error('H3 Image 的 area 必须为 1K / 2K / 4K');
+    const outputFormat = args.output_format ?? 'jpeg';
+    if (!H3_IMAGE_FORMATS.includes(outputFormat)) throw new Error('H3 Image 的 output_format 必须为 png / jpeg / jpg / webp');
+    const responseFormat = args.response_format ?? 'url';
+    if (!['url', 'b64_json'].includes(responseFormat)) throw new Error('H3 Image 的 response_format 必须为 url / b64_json');
+    const stream = args.stream ?? false;
+    if (typeof stream !== 'boolean') throw new Error('H3 Image 的 stream 必须为布尔值');
+    if (stream && responseFormat !== 'url') throw new Error('H3 Image 流式输出仅支持 response_format=url');
+    if (args.output_compression !== undefined && (!Number.isInteger(args.output_compression) || args.output_compression < 0 || args.output_compression > 100)) {
+      throw new Error('H3 Image 的 output_compression 必须为 0–100 的整数');
+    }
+    const disable = args.disable_prompt_enhanced;
+    if (disable !== undefined && typeof disable !== 'boolean') throw new Error('disable_prompt_enhanced 必须为布尔值');
+    if (!editing && disable === true && !explicitSize && (!ratio || ratio === 'auto')) {
+      throw new Error('关闭 Prompt 增强时必须指定显式 size 或固定 aspect_ratio');
+    }
     const n = args.n ?? 1;
-    if (!Number.isInteger(n) || n < 1 || n > IMAGE_COUNT_MAX) throw new Error('图片数量必须为 1 到 ' + IMAGE_COUNT_MAX);
-    const options = this.imageArgs(args);
-    return this.create('image', args, owner, signal, async (client) => {
-      const result = await createImage({ ...client, ...options, prompt });
-      return { sources: result.images.map(image => image.url ? { url: image.url } : { b64: image.base64 }) };
-    });
+    if (responseFormat === 'b64_json') {
+      const pixels = explicitSize ? size.pixels : H3_IMAGE_AREA_PIXELS[args.area || '4K'];
+      const limit = outputFormat === 'png' ? 20000000 : 80000000;
+      if (n * pixels > limit) throw new Error('H3 Image Base64 总输出面积超过 ' + limit + ' 像素，请减少张数、降低面积或改用 url');
+    }
+    const options = { model, output_format: outputFormat, response_format: responseFormat, stream };
+    if (size) options.size = size.size;
+    if (ratio) options.aspect_ratio = ratio;
+    if (args.area !== undefined) options.area = args.area;
+    if (args.output_compression !== undefined) options.output_compression = args.output_compression;
+    if (!editing && disable !== undefined) options.disable_prompt_enhanced = disable;
+    if (args.n !== undefined) options.n = args.n;
+    if (typeof args.aigc_watermark === 'boolean') options.aigc_watermark = args.aigc_watermark;
+    return options;
+  }
+  async image(args, owner, signal) {
+    const h3 = isH3Image(args.model);
+    const prompt = requireText(args.prompt, '图片描述', h3 ? H3_IMAGE_PROMPT_MAX : IMAGE_PROMPT_MAX);
+    const n = args.n ?? 1;
+    const max = h3 ? H3_IMAGE_COUNT_MAX : IMAGE_COUNT_MAX;
+    if (!Number.isInteger(n) || n < 1 || n > max) throw new Error('图片数量必须为 1 到 ' + max);
+    const options = this.imageArgs(args, false);
+    return this.create('image', args, owner, signal, async client => {
+      const result = h3 ? await createH3Image({ ...client, ...options, prompt }) : await createImage({ ...client, ...options, prompt });
+      return imageOutcome(result);
+    }, h3 ? Math.max(this.timeoutMs, H3_IMAGE_TIMEOUT_MS) : this.timeoutMs);
   }
   async editImage(args, owner, signal) {
-    const prompt = requireText(args.prompt, '图片描述', IMAGE_PROMPT_MAX);
+    const h3 = isH3Image(args.model);
+    const prompt = requireText(args.prompt, '图片描述', h3 ? H3_IMAGE_PROMPT_MAX : IMAGE_PROMPT_MAX);
     const n = args.n ?? 1;
-    if (!Number.isInteger(n) || n < 1 || n > IMAGE_COUNT_MAX) throw new Error('图片数量必须为 1 到 ' + IMAGE_COUNT_MAX);
-    const options = this.imageArgs(args);
-    const references = await this.imageReferences(args, owner);
-    return this.create('image', args, owner, signal, async (client) => {
-      const result = await createImage({
+    const max = h3 ? H3_IMAGE_COUNT_MAX : IMAGE_COUNT_MAX;
+    if (!Number.isInteger(n) || n < 1 || n > max) throw new Error('图片数量必须为 1 到 ' + max);
+    const options = this.imageArgs(args, true);
+    const references = await this.imageReferences(args, owner, h3);
+    return this.create('image', args, owner, signal, async client => {
+      const result = h3 ? await createH3Image({ ...client, ...options, prompt, images: references }) : await createImage({
         ...client, ...options, prompt,
         subject_reference: references.map(url => ({ type: 'character', image_file: url })),
       });
-      return { sources: result.images.map(image => image.url ? { url: image.url } : { b64: image.base64 }) };
-    });
+      return imageOutcome(result);
+    }, h3 ? Math.max(this.timeoutMs, H3_IMAGE_TIMEOUT_MS) : this.timeoutMs);
   }
   // 视频参数按接口版本分两套：H3 系走 v2，Hailuo 系走 v1。
   videoArgs(args) {

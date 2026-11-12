@@ -232,14 +232,23 @@ MiniMax 的文本参数映射到 dsh 本来的控制点；它们按请求生效�
 
 | 能力 | 模型 |
 | --- | --- |
-| 图片 | `image-01`（文生图与图生图）、`image-01-live`（同样支持文生图与图生图，另有画风设置） |
+| 图片（H3） | `MiniMax-H3-Image`、`MiniMax-H3-Image-Highspeed` —— 文生图与通用图片编辑，参数和限制相同 |
+| 图片（旧接口） | `image-01`（文生图与人像主体参考）、`image-01-live`（另有画风设置） |
 | 视频（v2 接口） | `MiniMax-H3`（768P / 2K，4–15 秒）、`MiniMax-H3-Highspeed`（480P / 768P，4–15 秒）、`MiniMax-H3-Lite`（480P / 768P，4–15 秒，不支持 `adaptive` 画幅）、`MiniMax-H3-Max`（480P / 768P，5–15 秒） |
 | 视频（v1 接口） | `MiniMax-Hailuo-2.3`、`MiniMax-Hailuo-2.3-Fast`（仅图生视频）、`MiniMax-Hailuo-02` —— 6 秒或 10 秒，512P / 720P / 768P / 1080P |
 | 语音合成 | `speech-2.8-hd`、`speech-2.8-turbo`、`speech-2.6-hd`、`speech-2.6-turbo`、`speech-02-hd`、`speech-02-turbo` |
 | 语音转文字 | `asr-1.0` |
 | 音乐 | `music-3.0`、`music-2.6`、`music-cover` —— 已退役，见下 |
 
-设置页的每个媒体模型卡片都会在下拉下方显示当前所选模型的一行简介，下拉选项里也直接带同样的简介。生图支持的宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01` 支持），`prompt` 不超过 1500 字，`n` 取值 1–9。`image-01` 还支持显式的 `width`/`height`（512–2048 像素、8 的倍数，必须成对）；同时给出时插件以显式宽高为准、不再下发宽高比（官方规则是两者同给时以宽高比为准、会忽略宽高）。`image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。图生图通过 `subject_reference` 传参考图（人物主体参考：公网 URL 或 `data:image/jpeg;base64,…` Data URL，JPG/JPEG/PNG 且小于 10MB）。
+设置页的每个媒体模型卡片都会在下拉下方显示当前所选模型的一行简介，下拉选项里也直接带同样的简介。
+
+**H3 Image**：文生图走 `POST /v1/images/generations`，编辑走 `POST /v1/images/edits`。两者均支持 `prompt` ≤32000 个 Unicode 字符、`n` 1–10、`output_format` 为 `jpeg`/`jpg`/`png`/`webp`、`output_compression` 0–100、可见 `aigc_watermark`、`response_format` 为 `url`/`b64_json`，以及 `stream` SSE 逐张输出。插件按 `image_index` 还原张序，保存成功项，并在结果中保留 `failures`、`usage`、`requestId`、实际尺寸和增强后的 Prompt。H3 请求使用至少 600 秒超时；接口不幂等，断连后也不能自动重试。
+
+尺寸可传 `size: auto`（默认）配合 `aspect_ratio` 与 `area`，也可直接传 `size: 宽x高`。面积档为 `1K`/`2K`/`4K`（默认 4K）；自定义比例支持 `auto` 或 X:Y（X/Y 为 1–300 的整数，比例 1:3–3:1）。显式宽高的面积为 655360–20000000 像素，且不能再传 `aspect_ratio` 或 `area`（`auto` 也不行）。工具的 `width`/`height` 会组合成 H3 的 `size`。文生图默认启用 Prompt 增强；`disable_prompt_enhanced: true` 时必须指定显式尺寸或固定比例。图片编辑始终增强，不接受该开关。Base64 不支持流式，PNG 的 `n × 面积` 不超过 2000 万像素，JPEG/WebP 不超过 8000 万像素。
+
+H3 编辑接受 1–16 张参考图，通过 `image_url`、`image_urls`、`source_task_id` 或 `source_task_ids` 传入，支持 HTTPS、小写格式的 data URI 和 `mm_file://{file_id}`。格式为 JPG/JPEG/PNG/WebP/HEIC/HEIF，单文件与整个编辑请求体均不超过 64MiB；Base64 会放大约 4/3，超限时应改用 URL 或 `mm_file`。参考图宽高均须为 128–8192 像素，长宽比不超过 4:1。不支持 mask、透明背景或预览图。
+
+**旧图片模型**：宽高比为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16`、`21:9`（`21:9` 仅 `image-01` 支持），`prompt` 不超过 1500 字，`n` 取值 1–9。`image-01` 还支持显式的 `width`/`height`（512–2048 像素、8 的倍数，必须成对）；同时给出时插件以显式宽高为准、不再下发宽高比。`image-01-live` 额外支持 `style`（`style_type` 取 漫画 / 元气 / 中世纪 / 水彩，`style_weight` 取值 (0, 1]）。图生图通过 `subject_reference` 传人像主体参考（公网 URL 或 data URI，JPG/JPEG/PNG 且小于 10MB）。旧模型的 `prompt_optimizer` 与 `seed` 不会混入 H3 请求。
 
 视频生成是三步异步流程：创建任务、查询任务、下载文件。插件会保留任务 id，因此 `minimax_media_status` 能在不重复提交的前提下取回成片。
 

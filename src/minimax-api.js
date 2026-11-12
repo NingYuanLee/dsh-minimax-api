@@ -1,6 +1,7 @@
 // MiniMax 媒体接口层：把官方 HTTP 接口包成不依赖插件运行时的纯函数，便于测试替换 fetch。
 // 端点与字段依据官方文档（platform.minimax.io/docs）：
-//   生图   POST /v1/image_generation
+//   生图   POST /v1/image_generation（image-01 系）
+//          POST /v1/images/generations、POST /v1/images/edits（H3 Image 系）
 //   视频   POST /v1/video_generation（Hailuo 系）、POST /v2/video_generation（H3 系）
 //   查询   GET  /v1/query/video_generation?task_id=...、GET /v2/query/video_generation/{task_id}
 //   取文件 GET  /v1/files/retrieve?file_id=...
@@ -11,6 +12,11 @@ export const DEFAULT_API_ROOT = 'https://api.minimax.io';
 
 // 官方文档给出的图片宽高比。
 export const IMAGE_ASPECT_RATIOS = ['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9'];
+export const H3_IMAGE_MODELS = ['MiniMax-H3-Image', 'MiniMax-H3-Image-Highspeed'];
+export const H3_IMAGE_AREAS = ['1K', '2K', '4K'];
+export const H3_IMAGE_FORMATS = ['png', 'jpeg', 'jpg', 'webp'];
+export const H3_IMAGE_MAX_BYTES = 64 * 1024 * 1024;
+export const H3_IMAGE_TIMEOUT_MS = 600000;
 // v1（Hailuo 系）视频分辨率与时长。
 export const VIDEO_RESOLUTIONS_V1 = ['720P', '768P', '1080P'];
 export const VIDEO_DURATIONS_V1 = [6, 10];
@@ -59,6 +65,10 @@ export function normalizeApiRoot(root) {
 // H3 系走 v2 接口，其余（Hailuo 系）走 v1 接口。
 export function isVideoV2(model) {
   return /^MiniMax-H3/i.test(String(model || ''));
+}
+
+export function isH3Image(model) {
+  return H3_IMAGE_MODELS.includes(String(model || ''));
 }
 
 export function audioMime(format) {
@@ -141,7 +151,7 @@ function raiseFromPayload(payload, status) {
   }
 }
 
-export async function requestJson({ apiRoot, apiKey, fetchImpl = fetch, signal, method = 'GET', path, query, body }) {
+export async function requestJson({ apiRoot, apiKey, fetchImpl = fetch, signal, method = 'GET', path, query, body, maxResponseBytes = 32 * 1024 * 1024 }) {
   const response = await fetchImpl(apiUrl(apiRoot, path, query), {
     method,
     headers: { authorization: 'Bearer ' + apiKey, accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
@@ -149,7 +159,7 @@ export async function requestJson({ apiRoot, apiKey, fetchImpl = fetch, signal, 
     redirect: 'error',
     signal,
   });
-  const text = await readBody(response, 32 * 1024 * 1024);
+  const text = await readBody(response, maxResponseBytes);
   let payload = null;
   if (text) { try { payload = JSON.parse(text); } catch { payload = null; } }
   if (!response.ok) {
@@ -185,6 +195,149 @@ export async function createImage({ apiRoot, apiKey, fetchImpl, signal, model = 
     urls,
     requestId: typeof payload?.id === 'string' ? payload.id : undefined,
   };
+}
+
+// H3 Image 的非流式响应是逐张对象：成功项含 url/b64_json，失败项含 error。
+function normalizeH3Images(payload) {
+  const images = [], failures = [];
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  rows.forEach((row, imageIndex) => {
+    if (row?.error) {
+      failures.push({ imageIndex, code: String(row.error.code ?? ''), message: String(row.error.message || '图片生成失败') });
+      return;
+    }
+    const url = typeof row?.url === 'string' && row.url.trim() ? row.url.trim() : undefined;
+    const base64 = typeof row?.b64_json === 'string' && row.b64_json ? row.b64_json : undefined;
+    if (!url && !base64) return;
+    images.push({
+      url, base64, imageIndex,
+      dimensions: typeof row.size === 'string' ? row.size : undefined,
+      revisedPrompt: typeof row.revised_prompt === 'string' ? row.revised_prompt : undefined,
+    });
+  });
+  if (!images.length) throw new MiniMaxError('MiniMax H3 Image 没有返回可保存的图片');
+  return {
+    images, failures,
+    usage: payload?.usage && typeof payload.usage === 'object' ? payload.usage : undefined,
+    requestId: typeof payload?.request_id === 'string' ? payload.request_id : undefined,
+  };
+}
+
+// SSE 的完成顺序不是张序，必须按 image_index 归位；completed 之前断流属于结果未知。
+async function readH3ImageStream(response, { n, editing }) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('MiniMax H3 Image 流式响应为空');
+  const prefix = editing ? 'image_edit' : 'image_generation';
+  const decoder = new TextDecoder();
+  const images = new Map(), failures = new Map();
+  let buffer = '', completed;
+  const consume = block => {
+    const data = block.split(/\r?\n/).filter(line => line.startsWith('data:'))
+      .map(line => line.slice(5).trimStart()).join('\n');
+    if (!data || data === '[DONE]') return;
+    let event;
+    try { event = JSON.parse(data); } catch { throw new MiniMaxError('MiniMax H3 Image 返回了无效 SSE 数据'); }
+    const type = event?.type;
+    if (type === 'error') {
+      raiseFromPayload(event, Number(event.error?.http_code) || 200);
+      throw new MiniMaxError('MiniMax H3 Image 流式生成失败');
+    }
+    if (type === prefix + '.completed') {
+      if (completed) throw new MiniMaxError('MiniMax H3 Image 重复返回完成事件');
+      completed = event; return;
+    }
+    if (type !== prefix + '.partial_succeeded' && type !== prefix + '.partial_failed') {
+      throw new MiniMaxError('MiniMax H3 Image 返回了未知 SSE 事件');
+    }
+    const index = event.image_index;
+    if (!Number.isInteger(index) || index < 0 || index >= n) throw new MiniMaxError('MiniMax H3 Image 返回了无效图片序号');
+    if (type.endsWith('.partial_succeeded')) {
+      if (images.has(index) || failures.has(index) || typeof event.url !== 'string' || !event.url.trim()) {
+        throw new MiniMaxError('MiniMax H3 Image 返回了重复或无效的图片事件');
+      }
+      images.set(index, {
+        url: event.url.trim(), imageIndex: index,
+        dimensions: typeof event.size === 'string' ? event.size : undefined,
+        revisedPrompt: typeof event.revised_prompt === 'string' ? event.revised_prompt : undefined,
+      });
+    } else {
+      if (failures.has(index) || images.has(index)) throw new MiniMaxError('MiniMax H3 Image 返回了重复图片事件');
+      failures.set(index, { imageIndex: index, code: String(event.code ?? ''), message: String(event.message || '图片生成失败') });
+    }
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let separator;
+      while ((separator = /\r?\n\r?\n/.exec(buffer))) {
+        const block = buffer.slice(0, separator.index);
+        buffer = buffer.slice(separator.index + separator[0].length);
+        consume(block);
+      }
+      if (buffer.length > 4 * 1024 * 1024) throw new MiniMaxError('MiniMax H3 Image SSE 事件超过大小限制');
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer);
+  } finally {
+    try { await reader.cancel(); } catch { /* 已读完 */ }
+    reader.releaseLock();
+  }
+  if (!completed) throw new Error('MiniMax H3 Image 流式响应在完成事件前中断');
+  const orderedImages = [...images.values()].sort((a, b) => a.imageIndex - b.imageIndex);
+  if (!orderedImages.length) throw new MiniMaxError('MiniMax H3 Image 完成事件中没有成功图片');
+  return {
+    images: orderedImages,
+    failures: [...failures.values()].sort((a, b) => a.imageIndex - b.imageIndex),
+    usage: completed.usage && typeof completed.usage === 'object' ? completed.usage : undefined,
+    requestId: typeof completed.request_id === 'string' ? completed.request_id : undefined,
+  };
+}
+
+// H3 Image 文生图与编辑分端点，参数名称和响应结构均不同于 image-01 系。
+export async function createH3Image({
+  apiRoot, apiKey, fetchImpl = fetch, signal, model, prompt, images,
+  n = 1, size, aspect_ratio, area, output_format = 'jpeg', response_format = 'url',
+  stream = false, output_compression, disable_prompt_enhanced, aigc_watermark,
+}) {
+  if (!isH3Image(model)) throw new MiniMaxError('不支持的 H3 图片模型：' + model);
+  const editing = images !== undefined;
+  if (stream && response_format !== 'url') throw new MiniMaxError('H3 Image 流式输出仅支持 response_format=url');
+  const body = { model, prompt, n, output_format, response_format, stream };
+  if (size) body.size = size;
+  if (aspect_ratio) body.aspect_ratio = aspect_ratio;
+  if (area) body.area = area;
+  if (Number.isInteger(output_compression)) body.output_compression = output_compression;
+  if (!editing && typeof disable_prompt_enhanced === 'boolean') body.disable_prompt_enhanced = disable_prompt_enhanced;
+  if (typeof aigc_watermark === 'boolean') body.aigc_watermark = aigc_watermark;
+  if (editing) body.images = images.map(image_url => ({ image_url }));
+  const serialized = JSON.stringify(body);
+  if (editing && Buffer.byteLength(serialized) > H3_IMAGE_MAX_BYTES) {
+    throw new MiniMaxError('H3 Image 编辑请求体不能超过 64MiB，请改用公网 URL 或 mm_file:// 参考图');
+  }
+  const path = editing ? '/v1/images/edits' : '/v1/images/generations';
+  if (!stream) {
+    const payload = await requestJson({
+      apiRoot, apiKey, fetchImpl, signal, method: 'POST', path, body,
+      // b64_json 的最大合法输出明显超过旧接口的 32MiB 响应上限。
+      maxResponseBytes: 160 * 1024 * 1024,
+    });
+    return normalizeH3Images(payload);
+  }
+  const response = await fetchImpl(apiUrl(apiRoot, path), {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + apiKey, accept: 'text/event-stream', 'content-type': 'application/json' },
+    body: serialized, redirect: 'error', signal,
+  });
+  if (!response.ok) {
+    const text = await readBody(response, 32 * 1024 * 1024);
+    let payload = null;
+    if (text) { try { payload = JSON.parse(text); } catch { payload = null; } }
+    raiseFromPayload(payload, response.status);
+    throw new MiniMaxError('MiniMax H3 Image 接口返回 HTTP ' + response.status, { status: response.status });
+  }
+  return readH3ImageStream(response, { n, editing });
 }
 
 // v1 视频（Hailuo 系）：文生视频用 prompt，图生视频用 first_frame_image。

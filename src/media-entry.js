@@ -42,36 +42,39 @@ export async function apply(ctx) {
     return runtime.requireModel(value, category);
   };
   const config = () => runtime.mediaConfig() || {};
-
-  tool('minimax_generate_image', '生成图片并保存到本地。文生图用 prompt；image-01 与 image-01-live 都支持图生图。省略 model 时用设置里的默认图片模型。status 不是 saved 时先查 minimax_media_status，不要重复生成。图片用绝对路径内联。',
-  { prompt: { type: 'string', required: true, description: '画面描述（主体、风格、构图、比例等），最长 1500 字符' },
+  const imageParameters = editing => ({
+    prompt: { type: 'string', required: true, description: editing ? '要做的修改；旧模型最长 1500 字符，H3 Image 最长 32000 个 Unicode 字符' : '画面描述（主体、风格、构图、比例等）；旧模型最长 1500 字符，H3 Image 最长 32000 个 Unicode 字符' },
     model: { type: 'string', description: '图片模型 ID，来自清单的 image 类；省略用插件默认' },
-    aspect_ratio: { type: 'string', description: '宽高比：1:1 / 16:9 / 4:3 / 3:2 / 2:3 / 3:4 / 9:16 / 21:9（21:9 仅 image-01）' },
-    width: { type: 'integer', description: '图片宽度像素，仅 image-01 支持，512–2048 且为 8 的倍数，必须与 height 成对' },
-    height: { type: 'integer', description: '图片高度像素，仅 image-01 支持，512–2048 且为 8 的倍数，必须与 width 成对' },
+    ...(editing ? {
+      image_url: { type: 'string', description: '一张参考图；H3 支持 HTTPS、mm_file://file_id、data:image/...;base64,...，旧模型支持 HTTPS/data URI' },
+      image_urls: { type: 'array', items: { type: 'string' }, description: '参考图列表；旧模型合计最多 5 张，H3 合计最多 16 张，顺序即图 1、图 2…' },
+      source_task_id: { type: 'string', description: '已保存图片任务的 id，引用其第一张图片' },
+      source_task_ids: { type: 'array', items: { type: 'string' }, description: '多个已保存图片任务 id，各引用第一张图片；H3 与其他参考图合计最多 16 张（旧模型仍最多 5 张）' },
+    } : {}),
+    size: { type: 'string', description: '仅 H3：auto（默认）或 宽x高，如 2720x1536；面积 655360–20000000，比例 1:3–3:1；显式宽高时不能再传 aspect_ratio/area' },
+    area: { type: 'string', description: '仅 H3：1K / 2K / 4K（默认），size 为 auto 或未传时可用' },
+    aspect_ratio: { type: 'string', description: '旧模型：1:1 / 16:9 / 4:3 / 3:2 / 2:3 / 3:4 / 9:16 / 21:9（21:9 仅 image-01）；H3：auto 或自定义 X:Y（X/Y 为 1–300，比例 1:3–3:1）' },
+    width: { type: 'integer', description: '旧模型仅 image-01：512–2048 且为 8 的倍数；H3 可替代 size 并与 height 成对使用，受总面积与比例限制' },
+    height: { type: 'integer', description: '旧模型仅 image-01：512–2048 且为 8 的倍数；H3 可替代 size 并与 width 成对使用，受总面积与比例限制' },
+    output_format: { type: 'string', description: '仅 H3：jpeg（默认）/ jpg / png / webp' },
+    response_format: { type: 'string', description: '仅 H3：url（默认，链接 24 小时有效）/ b64_json；Base64 不支持流式，PNG 总面积≤2000 万，JPEG/WebP≤8000 万像素' },
+    stream: { type: 'boolean', description: '仅 H3：true 时通过 SSE 逐张接收，默认 false；仅支持 response_format=url' },
+    output_compression: { type: 'integer', description: '仅 H3：0–100，默认 95；仅 JPEG/WebP 生效' },
+    ...(editing ? {} : { disable_prompt_enhanced: { type: 'boolean', description: '仅 H3 文生图：true 关闭 Prompt 增强，默认 false；关闭时必须指定显式 size 或固定 aspect_ratio' } }),
     style_type: { type: 'string', description: '画风，仅 image-01-live 支持：漫画 / 元气 / 中世纪 / 水彩' },
     style_weight: { type: 'number', description: '画风权重，仅 image-01-live 支持，(0, 1] 的数字，默认 0.8' },
-    n: { type: 'integer', description: '生成张数，1–9，默认 1' },
-    prompt_optimizer: { type: 'boolean', description: '是否自动优化提示词，默认 false' },
-    seed: { type: 'integer', description: '随机种子，同种子同参数可复现' },
-    aigc_watermark: { type: 'boolean', description: '是否给图片加 AIGC 水印，默认 false' } },
+    n: { type: 'integer', description: '生成张数：旧模型 1–9，H3 1–10，默认 1' },
+    prompt_optimizer: { type: 'boolean', description: '仅旧模型：是否自动优化提示词，默认 false；H3 文生图改用 disable_prompt_enhanced' },
+    seed: { type: 'integer', description: '仅旧模型：随机种子；H3 Image 不支持' },
+    aigc_watermark: { type: 'boolean', description: '是否给图片加可见 AIGC 水印，默认 false；文件元数据中的隐式标识不受此参数控制' },
+  });
+
+  tool('minimax_generate_image', '生成图片并保存到本地。支持旧 image-01 系与 MiniMax-H3-Image / Highspeed；H3 完整支持尺寸、面积档、格式、Base64 与 SSE。省略 model 时用设置里的默认图片模型。status 不是 saved 时先查 minimax_media_status，不要重复生成。部分失败见 failures。图片用绝对路径内联。',
+    imageParameters(false),
   async (args, exec) => (await runtime.manager()).image({ ...args, model: modelOf(args, 'image', config().imageModel, '图片') }, ownerOf(exec), signalOf(exec)));
 
-  tool('minimax_edit_image', '按参考图编辑图片并保存。参考图给 image_url、image_urls 或 source_task_id 之一（当前仅人像主体参考）。失败时先查 minimax_media_status，不要重复编辑。',
-  { prompt: { type: 'string', required: true, description: '要做的修改，最长 1500 字符' },
-    model: { type: 'string', description: '图片模型 ID；省略用插件默认' },
-    image_url: { type: 'string', description: '一张参考图的 HTTPS 地址或 data:image/...;base64,... ' },
-    image_urls: { type: 'array', items: { type: 'string' }, description: '最多 5 张参考图的 HTTPS 地址' },
-    source_task_id: { type: 'string', description: '已保存图片任务的 id；本地文件超过 8MB 时请改用 HTTPS 地址' },
-    aspect_ratio: { type: 'string', description: '宽高比：1:1 / 16:9 / 4:3 / 3:2 / 2:3 / 3:4 / 9:16 / 21:9（21:9 仅 image-01）' },
-    width: { type: 'integer', description: '图片宽度像素，仅 image-01 支持，512–2048 且为 8 的倍数，必须与 height 成对' },
-    height: { type: 'integer', description: '图片高度像素，仅 image-01 支持，512–2048 且为 8 的倍数，必须与 width 成对' },
-    style_type: { type: 'string', description: '画风，仅 image-01-live 支持：漫画 / 元气 / 中世纪 / 水彩' },
-    style_weight: { type: 'number', description: '画风权重，仅 image-01-live 支持，(0, 1] 的数字，默认 0.8' },
-    n: { type: 'integer', description: '生成张数，1–9，默认 1' },
-    prompt_optimizer: { type: 'boolean', description: '是否自动优化提示词，默认 false' },
-    seed: { type: 'integer', description: '随机种子，同种子同参数可复现' },
-    aigc_watermark: { type: 'boolean', description: '是否给图片加 AIGC 水印，默认 false' } },
+  tool('minimax_edit_image', '按参考图编辑图片并保存。H3 支持 1–16 张通用参考图（HTTPS、mm_file、data URI、已保存任务），旧模型仍为最多 5 张人像主体参考。失败时先查 minimax_media_status，不要重复编辑。部分失败见 failures。',
+    imageParameters(true),
   async (args, exec) => (await runtime.manager()).editImage({ ...args, model: modelOf(args, 'image', config().imageModel, '图片') }, ownerOf(exec), signalOf(exec)));
 
   tool('minimax_generate_video', '提交视频生成任务并保存成片。带 image_url 或 source_task_id 时用该静帧做首帧。H3 系 4–15 秒，Hailuo 系只能 6 或 10 秒；文生视频必须给具体 ratio，图生视频固定 adaptive，H3-Lite 不支持 adaptive。提交后用 minimax_media_status 取回；status=submission-unknown 时不要重复提交。视频由结果卡片播放，不要用 Markdown 内联。',

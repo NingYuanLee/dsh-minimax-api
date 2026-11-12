@@ -141,6 +141,13 @@ npm pack --dry-run --ignore-scripts
 - ⚠️ **模型分类**：分类基于内置规则与关键字，不是上游保证；历史模型或研究类模型未必适合当 Agent 工具使用。
 - ⚠️ **上游变更**：MiniMax 频繁调整模型与端点（例如本轮内 M2.x 退役、国内域名切换）。文档结论会随官方文档变化而过期，请以 `docs/minimax-api-notes.md` 记录的来源 URL 为准重新核对。
 
+## 2026-11-13 H3 Image 适配验收
+
+- ✅ 源码语法检查、客户端构建与 `npm pack --dry-run --ignore-scripts` 通过。
+- ✅ `npm test`：136 项全部通过；新增 H3 文生图、编辑、Base64、SSE 乱序/部分失败/整体失败/断流、16 张参考图、参数互斥与旧模型兼容测试。测试服务端均为 `127.0.0.1` 桩服务。
+- ✅ 真实文生图：使用 `MiniMax-H3-Image`，`n=1`、`area=1K`、`aspect_ratio=1:1`、`response_format=url`、`output_format=jpeg`、非流式，成功生成并保存 1 张 1024×1024 JPEG；响应包含 `revised_prompt`、`usage` 与请求 ID `0745521ef2a82e1759e944cb3d8c9784`。
+- ⚠️ 真实账号仅验证了上述文生图路径；图片编辑、Highspeed、Base64 与 SSE 的真实上游调用未执行，这些路径由本机桩测试覆盖。
+
 ## 不公开的测试材料
 
 独立 profile、日志、凭据引用环境与生成物都放在被忽略的本地测试目录。调用密钥不进入源代码、仓库、任务公开结果或媒体下载请求。

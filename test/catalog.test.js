@@ -10,6 +10,10 @@ test('发现结果与内置常量合并，媒体模型不会进入对话清单',
   assert.ok(ids.includes('image-01'), '内置媒体模型应补齐');
   assert.ok(catalog.every(x => x.verified === false));
   assert.equal(catalog.find(x => x.id === 'image-01').category, 'image');
+  for (const id of ['MiniMax-H3-Image', 'MiniMax-H3-Image-Highspeed']) {
+    assert.equal(catalog.find(x => x.id === id)?.category, 'image', id + ' 应内置为图片模型');
+    assert.match(catalog.find(x => x.id === id)?.note || '', /H3|参考图/);
+  }
   assert.equal(catalog.find(x => x.id === 'MiniMax-Hailuo-2.3').category, 'video');
   assert.equal(catalog.find(x => x.id === 'speech-02-hd').category, 'speech');
   assert.equal(catalog.find(x => x.id === 'music-3.0').category, 'music');
